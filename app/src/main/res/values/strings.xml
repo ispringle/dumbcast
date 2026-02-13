@@ -43,4 +43,13 @@
     <string name="dialog_delete_download_message">Delete downloaded file for \"%s\"?</string>
     <string name="dialog_delete">Delete</string>
     <string name="dialog_cancel">Cancel</string>
+    <string name="menu_view_episodes">View Episodes</string>
+    <string name="menu_view_podcast_info">View Podcast Info</string>
+    <string name="toast_already_subscribed">Already subscribed to this podcast</string>
+    <string name="dialog_podcast_info_title">Podcast Info</string>
+    <string name="dialog_subscribe_confirm">Subscribe to \"%s\"?</string>
+    <string name="podcast_info_author">Author: %s</string>
+    <string name="podcast_info_episodes">Episodes: %d</string>
+    <string name="podcast_info_description">Description:\n%s</string>
+    <string name="error_subscribe_with_details">Error: %s</string>
 </resources>

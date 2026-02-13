@@ -18,6 +18,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
 import com.ispringle.dumbcast.R;
 import com.ispringle.dumbcast.adapters.EpisodeAdapter;
@@ -30,6 +34,10 @@ import com.ispringle.dumbcast.data.Podcast;
 import com.ispringle.dumbcast.data.PodcastRepository;
 import com.ispringle.dumbcast.services.DownloadService;
 import com.ispringle.dumbcast.services.PlaybackService;
+import com.ispringle.dumbcast.utils.RssFeed;
+import com.ispringle.dumbcast.utils.RssParser;
+
+import org.xmlpull.v1.XmlPullParserException;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -54,6 +62,8 @@ public class EpisodeListFragment extends Fragment {
     private static final String TAG = "EpisodeListFragment";
     private static final String ARG_PODCAST_ID = "podcast_id";
     private static final String ARG_EPISODE_STATE = "episode_state";
+    private static final String ARG_PREVIEW_FEED_URL = "preview_feed_url";
+    private static final String ARG_PREVIEW_TITLE = "preview_title";
 
     private ListView listView;
     private TextView titleText;
@@ -64,6 +74,9 @@ public class EpisodeListFragment extends Fragment {
 
     private long podcastId = -1;
     private EpisodeState episodeState = null;
+    private String previewFeedUrl = null;
+    private String previewTitle = null;
+    private boolean isPreviewMode = false;
 
     public EpisodeListFragment() {
         // Required empty public constructor
@@ -110,6 +123,22 @@ public class EpisodeListFragment extends Fragment {
         return fragment;
     }
 
+    /**
+     * Create a new instance to preview episodes from a feed URL without subscribing.
+     * This is a read-only preview mode - episodes are not saved to database.
+     * @param feedUrl The RSS feed URL
+     * @param podcastTitle The podcast title
+     * @return Fragment instance
+     */
+    public static EpisodeListFragment newInstanceForPreview(String feedUrl, String podcastTitle) {
+        EpisodeListFragment fragment = new EpisodeListFragment();
+        Bundle args = new Bundle();
+        args.putString(ARG_PREVIEW_FEED_URL, feedUrl);
+        args.putString(ARG_PREVIEW_TITLE, podcastTitle);
+        fragment.setArguments(args);
+        return fragment;
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -119,9 +148,12 @@ public class EpisodeListFragment extends Fragment {
             if (stateStr != null) {
                 episodeState = EpisodeState.fromString(stateStr);
             }
+            previewFeedUrl = getArguments().getString(ARG_PREVIEW_FEED_URL);
+            previewTitle = getArguments().getString(ARG_PREVIEW_TITLE);
+            isPreviewMode = (previewFeedUrl != null);
         }
 
-        Log.d(TAG, "onCreate - podcastId: " + podcastId + ", episodeState: " + episodeState);
+        Log.d(TAG, "onCreate - podcastId: " + podcastId + ", episodeState: " + episodeState + ", previewMode: " + isPreviewMode);
 
         // Initialize repositories using singleton DatabaseHelper
         DatabaseHelper dbHelper = DatabaseManager.getInstance(getContext());
@@ -214,7 +246,9 @@ public class EpisodeListFragment extends Fragment {
      * Update the fragment title based on the filter type.
      */
     private void updateTitle() {
-        if (podcastId != -1) {
+        if (isPreviewMode) {
+            titleText.setText(previewTitle + " (Preview)");
+        } else if (podcastId != -1) {
             // Load podcast name asynchronously
             new LoadPodcastTitleTask(this, podcastRepository, titleText).execute(podcastId);
         } else if (episodeState != null) {
@@ -228,7 +262,11 @@ public class EpisodeListFragment extends Fragment {
      * Load episodes and related podcasts from database on a background thread.
      */
     private void loadEpisodes() {
-        new LoadEpisodesTask(this, episodeRepository, podcastRepository).execute();
+        if (isPreviewMode) {
+            new LoadPreviewEpisodesTask(this, previewFeedUrl, previewTitle).execute();
+        } else {
+            new LoadEpisodesTask(this, episodeRepository, podcastRepository).execute();
+        }
     }
 
     /**
@@ -269,6 +307,12 @@ public class EpisodeListFragment extends Fragment {
      * If downloaded, play it and navigate to PlayerFragment. If not downloaded, show message.
      */
     private void handleEpisodeClick(Episode episode) {
+        // In preview mode, disable playback/download actions
+        if (isPreviewMode) {
+            Toast.makeText(getContext(), "Subscribe to podcast to play or download episodes", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         if (episode.isDownloaded()) {
             // Start PlaybackService and load the episode
             Intent serviceIntent = new Intent(getContext(), PlaybackService.class);
@@ -311,6 +355,12 @@ public class EpisodeListFragment extends Fragment {
      * Save to BACKLOG if not already in BACKLOG or LISTENED state.
      */
     private void handleEpisodeLongClick(Episode episode) {
+        // In preview mode, disable database actions
+        if (isPreviewMode) {
+            Toast.makeText(getContext(), "Subscribe to podcast to save to backlog", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         EpisodeState currentState = episode.getState();
 
         if (currentState == EpisodeState.BACKLOG) {
@@ -337,6 +387,12 @@ public class EpisodeListFragment extends Fragment {
         }
 
         if (getContext() == null) {
+            return;
+        }
+
+        // In preview mode, don't show context menu (no database actions available)
+        if (isPreviewMode) {
+            Toast.makeText(getContext(), "Subscribe to podcast to interact with episodes", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -682,6 +738,112 @@ public class EpisodeListFragment extends Fragment {
                 } else {
                     Toast.makeText(fragment.getContext(), R.string.toast_failed_update_episode, Toast.LENGTH_SHORT).show();
                 }
+            }
+        }
+    }
+
+    /**
+     * AsyncTask to load episodes from RSS feed for preview mode (without saving to database).
+     */
+    private static class LoadPreviewEpisodesTask extends AsyncTask<Void, Void, EpisodeData> {
+        private final WeakReference<EpisodeListFragment> fragmentRef;
+        private final String feedUrl;
+        private final String podcastTitle;
+
+        LoadPreviewEpisodesTask(EpisodeListFragment fragment, String feedUrl, String podcastTitle) {
+            this.fragmentRef = new WeakReference<>(fragment);
+            this.feedUrl = feedUrl;
+            this.podcastTitle = podcastTitle;
+        }
+
+        @Override
+        protected EpisodeData doInBackground(Void... voids) {
+            try {
+                Log.d(TAG, "Loading preview episodes from: " + feedUrl);
+
+                // Fetch RSS feed
+                RssFeed feed = fetchFeedWithRedirects(feedUrl, 5);
+
+                // Create temporary Episode objects (not saved to database)
+                List<Episode> episodes = new ArrayList<>();
+                if (feed != null && feed.getItems() != null) {
+                    for (RssFeed.RssItem rssItem : feed.getItems()) {
+                        Episode episode = new Episode(
+                            0, // Temporary podcast ID (not in database)
+                            rssItem.getGuid() != null ? rssItem.getGuid() : rssItem.getEnclosureUrl(),
+                            rssItem.getTitle(),
+                            rssItem.getEnclosureUrl(),
+                            rssItem.getPublishedAt()
+                        );
+                        episode.setDescription(rssItem.getDescription());
+                        episode.setDuration(rssItem.getDuration());
+                        episode.setState(EpisodeState.AVAILABLE);
+                        episodes.add(episode);
+                    }
+                }
+
+                // Create temporary Podcast for the cache
+                Map<Long, Podcast> podcastCache = new HashMap<>();
+                Podcast tempPodcast = new Podcast(0, feedUrl, podcastTitle);
+                podcastCache.put(0L, tempPodcast);
+
+                Log.d(TAG, "Loaded " + episodes.size() + " preview episodes");
+                return new EpisodeData(episodes, podcastCache);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to load preview episodes", e);
+                return new EpisodeData(new ArrayList<Episode>(), new HashMap<Long, Podcast>());
+            }
+        }
+
+        @Override
+        protected void onPostExecute(EpisodeData data) {
+            EpisodeListFragment fragment = fragmentRef.get();
+            if (fragment != null) {
+                fragment.updateEpisodeList(data);
+            }
+        }
+
+        /**
+         * Fetch RSS feed with manual redirect following.
+         */
+        private RssFeed fetchFeedWithRedirects(String feedUrl, int maxRedirects) throws IOException, XmlPullParserException {
+            if (maxRedirects <= 0) {
+                throw new IOException("Too many redirects");
+            }
+
+            URL url = new URL(feedUrl);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+
+            try {
+                connection.setRequestMethod("GET");
+                connection.setConnectTimeout(15000);
+                connection.setReadTimeout(15000);
+                connection.setRequestProperty("User-Agent", "Dumbcast/1.0");
+                connection.setInstanceFollowRedirects(false);
+
+                int responseCode = connection.getResponseCode();
+
+                // Handle redirects
+                if (responseCode >= 300 && responseCode < 400) {
+                    String newUrl = connection.getHeaderField("Location");
+                    if (newUrl == null) {
+                        throw new IOException("Redirect with no Location header");
+                    }
+
+                    Log.d(TAG, "Following redirect: " + feedUrl + " -> " + newUrl);
+                    connection.disconnect();
+                    return fetchFeedWithRedirects(newUrl, maxRedirects - 1);
+                }
+
+                if (responseCode != HttpURLConnection.HTTP_OK) {
+                    throw new IOException("HTTP error code: " + responseCode);
+                }
+
+                InputStream inputStream = connection.getInputStream();
+                RssParser parser = new RssParser();
+                return parser.parse(inputStream);
+            } finally {
+                connection.disconnect();
             }
         }
     }

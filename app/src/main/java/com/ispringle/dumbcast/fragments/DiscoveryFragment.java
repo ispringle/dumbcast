@@ -1,5 +1,7 @@
 package com.ispringle.dumbcast.fragments;
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
@@ -116,6 +118,37 @@ public class DiscoveryFragment extends Fragment {
             }
         });
 
+        // Add key listener for D-pad navigation
+        resultsList.setOnKeyListener(new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        int position = resultsList.getSelectedItemPosition();
+                        if (position >= 0) {
+                            PodcastIndexApi.SearchResult result = adapter.getItem(position);
+                            if (result != null) {
+                                showSubscribeDialog(result);
+                                return true;
+                            }
+                        }
+                    }
+                } else if (keyCode == KeyEvent.KEYCODE_MENU) {
+                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        int position = resultsList.getSelectedItemPosition();
+                        if (position >= 0) {
+                            PodcastIndexApi.SearchResult result = adapter.getItem(position);
+                            if (result != null) {
+                                showContextMenu(result);
+                                return true;
+                            }
+                        }
+                    }
+                }
+                return false;
+            }
+        });
+
         return view;
     }
 
@@ -190,11 +223,122 @@ public class DiscoveryFragment extends Fragment {
     private void showSubscribeDialog(final PodcastIndexApi.SearchResult result) {
         // For KaiOS, we'll show a simple confirmation with a toast
         // and subscribe directly
-        String message = "Subscribe to \"" + result.getTitle() + "\"?";
+        String message = getString(R.string.dialog_subscribe_confirm, result.getTitle());
         Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
 
         // Subscribe immediately
         subscribeToResult(result);
+    }
+
+    /**
+     * Show context menu for a search result.
+     * @param result The search result to show options for
+     */
+    private void showContextMenu(final PodcastIndexApi.SearchResult result) {
+        if (result == null) {
+            return;
+        }
+
+        if (getContext() == null) {
+            return;
+        }
+
+        final String[] menuItems = new String[] {
+            getString(R.string.subscribe),
+            getString(R.string.menu_view_episodes),
+            getString(R.string.menu_view_podcast_info)
+        };
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle(result.getTitle());
+        builder.setItems(menuItems, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                handleContextMenuAction(result, which);
+            }
+        });
+        builder.show();
+    }
+
+    /**
+     * Handle context menu action selection.
+     * @param result The search result to perform action on
+     * @param actionIndex The selected menu item index
+     */
+    private void handleContextMenuAction(PodcastIndexApi.SearchResult result, int actionIndex) {
+        switch (actionIndex) {
+            case 0:
+                subscribeToPodcast(result);
+                break;
+            case 1:
+                viewEpisodes(result);
+                break;
+            case 2:
+                viewPodcastInfo(result);
+                break;
+            default:
+                Log.w(TAG, "Unknown menu action index: " + actionIndex);
+                break;
+        }
+    }
+
+    /**
+     * Subscribe to a podcast with duplicate check.
+     * @param result The search result to subscribe to
+     */
+    private void subscribeToPodcast(PodcastIndexApi.SearchResult result) {
+        // Check if already subscribed
+        new CheckSubscriptionTask(this, podcastRepository, result).execute();
+    }
+
+    /**
+     * View episodes for a podcast without subscribing (preview mode).
+     * @param result The search result to preview episodes for
+     */
+    private void viewEpisodes(PodcastIndexApi.SearchResult result) {
+        // Navigate to episode list in preview mode
+        EpisodeListFragment fragment = EpisodeListFragment.newInstanceForPreview(
+            result.getFeedUrl(),
+            result.getTitle()
+        );
+
+        FragmentTransaction transaction = getActivity().getSupportFragmentManager().beginTransaction();
+        transaction.replace(R.id.fragment_container, fragment);
+        transaction.addToBackStack(null);
+        transaction.commit();
+
+        Log.d(TAG, "Navigating to episode preview for: " + result.getTitle());
+    }
+
+    /**
+     * Show podcast information dialog.
+     * @param result The search result to show info for
+     */
+    private void viewPodcastInfo(PodcastIndexApi.SearchResult result) {
+        if (getContext() == null) {
+            return;
+        }
+
+        // Build info message
+        StringBuilder info = new StringBuilder();
+
+        if (result.getAuthor() != null && !result.getAuthor().isEmpty()) {
+            info.append(getString(R.string.podcast_info_author, result.getAuthor())).append("\n\n");
+        }
+
+        if (result.getEpisodeCount() > 0) {
+            info.append(getString(R.string.podcast_info_episodes, result.getEpisodeCount())).append("\n\n");
+        }
+
+        if (result.getDescription() != null && !result.getDescription().isEmpty()) {
+            info.append(getString(R.string.podcast_info_description, result.getDescription()));
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle(result.getTitle());
+        builder.setMessage(info.toString());
+        builder.setPositiveButton(getString(R.string.dialog_cancel), null);
+        builder.show();
     }
 
     /**
@@ -287,6 +431,47 @@ public class DiscoveryFragment extends Fragment {
     }
 
     /**
+     * AsyncTask to check if a podcast is already subscribed.
+     */
+    private static class CheckSubscriptionTask extends AsyncTask<Void, Void, Boolean> {
+        private final WeakReference<DiscoveryFragment> fragmentRef;
+        private final PodcastRepository repository;
+        private final PodcastIndexApi.SearchResult result;
+
+        CheckSubscriptionTask(DiscoveryFragment fragment, PodcastRepository repository,
+                            PodcastIndexApi.SearchResult result) {
+            this.fragmentRef = new WeakReference<>(fragment);
+            this.repository = repository;
+            this.result = result;
+        }
+
+        @Override
+        protected Boolean doInBackground(Void... voids) {
+            try {
+                Podcast existing = repository.getPodcastByFeedUrl(result.getFeedUrl());
+                return existing != null;
+            } catch (Exception e) {
+                Log.e(TAG, "Error checking subscription", e);
+                return false;
+            }
+        }
+
+        @Override
+        protected void onPostExecute(Boolean isSubscribed) {
+            DiscoveryFragment fragment = fragmentRef.get();
+            if (fragment == null || fragment.getContext() == null) return;
+
+            if (isSubscribed) {
+                Toast.makeText(fragment.getContext(),
+                    fragment.getString(R.string.toast_already_subscribed),
+                    Toast.LENGTH_LONG).show();
+            } else {
+                fragment.subscribeToResult(result);
+            }
+        }
+    }
+
+    /**
      * AsyncTask to subscribe to a podcast on a background thread.
      */
     private static class SubscribeTask extends AsyncTask<Void, Void, String> {
@@ -357,15 +542,15 @@ public class DiscoveryFragment extends Fragment {
             if ("SUCCESS".equals(result)) {
                 fragment.onSubscribeSuccess();
             } else if ("ALREADY_SUBSCRIBED".equals(result)) {
-                Toast.makeText(fragment.getContext(), "Already subscribed to this podcast", Toast.LENGTH_LONG).show();
+                Toast.makeText(fragment.getContext(), fragment.getString(R.string.toast_already_subscribed), Toast.LENGTH_LONG).show();
                 fragment.hideStatus();
             } else {
                 // Show detailed error message
-                String errorMsg = "Failed to subscribe";
+                String errorMsg = fragment.getString(R.string.error_subscribe);
                 if (result != null && result.startsWith("NETWORK_ERROR")) {
-                    errorMsg = "Network error. Check connection and try again.";
+                    errorMsg = fragment.getString(R.string.error_network);
                 } else if (result != null && result.startsWith("ERROR:")) {
-                    errorMsg = "Error: " + result.substring(7);
+                    errorMsg = fragment.getString(R.string.error_subscribe_with_details, result.substring(7));
                 }
                 Toast.makeText(fragment.getContext(), errorMsg, Toast.LENGTH_LONG).show();
                 fragment.hideStatus();
