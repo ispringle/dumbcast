@@ -39,6 +39,8 @@
     <string name="toast_failed_delete_download">Failed to delete download</string>
     <string name="toast_marked_viewed">Marked as viewed</string>
     <string name="toast_failed_update_episode">Failed to update episode</string>
+    <string name="toast_marked_episodes_viewed">Marked %d episodes as viewed</string>
+    <string name="toast_no_new_episodes">No NEW episodes found</string>
     <string name="dialog_delete_download_title">Delete Download</string>
     <string name="dialog_delete_download_message">Delete downloaded file for \"%s\"?</string>
     <string name="dialog_delete">Delete</string>

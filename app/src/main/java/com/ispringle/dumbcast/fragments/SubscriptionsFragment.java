@@ -22,7 +22,9 @@ import com.ispringle.dumbcast.R;
 import com.ispringle.dumbcast.adapters.PodcastAdapter;
 import com.ispringle.dumbcast.data.DatabaseHelper;
 import com.ispringle.dumbcast.data.DatabaseManager;
+import com.ispringle.dumbcast.data.Episode;
 import com.ispringle.dumbcast.data.EpisodeRepository;
+import com.ispringle.dumbcast.data.EpisodeState;
 import com.ispringle.dumbcast.data.Podcast;
 import com.ispringle.dumbcast.data.PodcastRepository;
 
@@ -280,11 +282,12 @@ public class SubscriptionsFragment extends Fragment {
     }
 
     /**
-     * Remove NEW flag from all episodes of a podcast (stub implementation).
+     * Remove NEW flag from all episodes of a podcast.
+     * Updates all NEW episodes to AVAILABLE state.
      * @param podcast The podcast to update
      */
     private void removeNewFromAllEpisodes(Podcast podcast) {
-        Toast.makeText(getContext(), getString(R.string.toast_remove_new, podcast.getTitle()), Toast.LENGTH_SHORT).show();
+        new RemoveNewFromAllTask(this, episodeRepository, podcast).execute();
     }
 
     /**
@@ -320,6 +323,52 @@ public class SubscriptionsFragment extends Fragment {
             SubscriptionsFragment fragment = fragmentRef.get();
             if (fragment != null && data != null) {
                 fragment.updatePodcastList(data);
+            }
+        }
+    }
+
+    /**
+     * AsyncTask to remove NEW state from all episodes of a podcast on a background thread.
+     */
+    private static class RemoveNewFromAllTask extends AsyncTask<Void, Void, Integer> {
+        private final WeakReference<SubscriptionsFragment> fragmentRef;
+        private final EpisodeRepository episodeRepository;
+        private final Podcast podcast;
+
+        RemoveNewFromAllTask(SubscriptionsFragment fragment, EpisodeRepository episodeRepository, Podcast podcast) {
+            this.fragmentRef = new WeakReference<>(fragment);
+            this.episodeRepository = episodeRepository;
+            this.podcast = podcast;
+        }
+
+        @Override
+        protected Integer doInBackground(Void... voids) {
+            // Get all NEW episodes for this podcast
+            List<Episode> newEpisodes = episodeRepository.getEpisodesByPodcastAndState(podcast.getId(), EpisodeState.NEW);
+
+            int updatedCount = 0;
+            for (Episode episode : newEpisodes) {
+                int result = episodeRepository.updateEpisodeState(episode.getId(), EpisodeState.AVAILABLE);
+                if (result > 0) {
+                    updatedCount++;
+                }
+            }
+
+            return updatedCount;
+        }
+
+        @Override
+        protected void onPostExecute(Integer updatedCount) {
+            SubscriptionsFragment fragment = fragmentRef.get();
+            if (fragment != null && fragment.getContext() != null) {
+                if (updatedCount > 0) {
+                    String message = fragment.getString(R.string.toast_marked_episodes_viewed, updatedCount);
+                    Toast.makeText(fragment.getContext(), message, Toast.LENGTH_SHORT).show();
+                    // Refresh the podcast list to update episode counts
+                    fragment.loadPodcasts();
+                } else {
+                    Toast.makeText(fragment.getContext(), R.string.toast_no_new_episodes, Toast.LENGTH_SHORT).show();
+                }
             }
         }
     }
