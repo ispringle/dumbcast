@@ -27,15 +27,12 @@ import com.ispringle.dumbcast.data.Podcast;
 import com.ispringle.dumbcast.data.PodcastRepository;
 import com.ispringle.dumbcast.utils.PodcastIndexApi;
 import com.ispringle.dumbcast.utils.RssFeed;
-import com.ispringle.dumbcast.utils.RssParser;
+import com.ispringle.dumbcast.utils.RssFeedUtils;
 
 import org.xmlpull.v1.XmlPullParserException;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.lang.ref.WeakReference;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -296,6 +293,12 @@ public class DiscoveryFragment extends Fragment {
      * @param result The search result to preview episodes for
      */
     private void viewEpisodes(PodcastIndexApi.SearchResult result) {
+        // Check if fragment is in valid state for transaction (I3)
+        if (!isAdded() || getActivity() == null) {
+            Log.w(TAG, "Fragment not attached, cannot navigate to preview");
+            return;
+        }
+
         // Navigate to episode list in preview mode
         EpisodeListFragment fragment = EpisodeListFragment.newInstanceForPreview(
             result.getFeedUrl(),
@@ -473,8 +476,10 @@ public class DiscoveryFragment extends Fragment {
 
     /**
      * AsyncTask to subscribe to a podcast on a background thread.
+     * Uses SubscribeResult for type-safe error handling (M1).
+     * Subscription check removed - already done by CheckSubscriptionTask (I1).
      */
-    private static class SubscribeTask extends AsyncTask<Void, Void, String> {
+    private static class SubscribeTask extends AsyncTask<Void, Void, SubscribeResult> {
         private final WeakReference<DiscoveryFragment> fragmentRef;
         private final PodcastRepository repository;
         private final PodcastIndexApi.SearchResult result;
@@ -487,21 +492,14 @@ public class DiscoveryFragment extends Fragment {
         }
 
         @Override
-        protected String doInBackground(Void... voids) {
+        protected SubscribeResult doInBackground(Void... voids) {
             try {
                 Log.d(TAG, "Subscribing to: " + result.getTitle());
                 Log.d(TAG, "Feed URL: " + result.getFeedUrl());
 
-                // Check if already subscribed
-                Podcast existing = repository.getPodcastByFeedUrl(result.getFeedUrl());
-                if (existing != null) {
-                    Log.d(TAG, "Already subscribed to this podcast");
-                    return "ALREADY_SUBSCRIBED";
-                }
-
-                // Fetch RSS feed
+                // Fetch RSS feed using shared utility (C1)
                 Log.d(TAG, "Fetching RSS feed...");
-                RssFeed feed = fetchFeed(result.getFeedUrl());
+                RssFeed feed = RssFeedUtils.fetchFeed(result.getFeedUrl());
                 Log.d(TAG, "RSS feed fetched successfully");
 
                 // Create podcast object
@@ -515,7 +513,7 @@ public class DiscoveryFragment extends Fragment {
                 long podcastId = repository.insertPodcast(podcast);
                 if (podcastId == -1) {
                     Log.e(TAG, "Failed to insert podcast into database");
-                    return "DATABASE_ERROR";
+                    return SubscribeResult.unknownError("Database insertion failed");
                 }
                 Log.d(TAG, "Podcast inserted with ID: " + podcastId);
 
@@ -524,93 +522,48 @@ public class DiscoveryFragment extends Fragment {
                 repository.refreshPodcast(podcastId);
                 Log.d(TAG, "Episodes fetched successfully");
 
-                return "SUCCESS";
+                return SubscribeResult.success();
             } catch (IOException e) {
                 Log.e(TAG, "Network error while subscribing", e);
-                return "NETWORK_ERROR: " + e.getMessage();
+                return SubscribeResult.networkError(e.getMessage());
+            } catch (XmlPullParserException e) {
+                Log.e(TAG, "Parse error while subscribing", e);
+                return SubscribeResult.parseError(e.getMessage());
             } catch (Exception e) {
                 Log.e(TAG, "Subscribe failed", e);
-                return "ERROR: " + e.getMessage();
+                return SubscribeResult.unknownError(e.getMessage());
             }
         }
 
         @Override
-        protected void onPostExecute(String result) {
+        protected void onPostExecute(SubscribeResult result) {
             DiscoveryFragment fragment = fragmentRef.get();
             if (fragment == null || fragment.getContext() == null) return;
 
-            if ("SUCCESS".equals(result)) {
+            if (result.isSuccess()) {
                 fragment.onSubscribeSuccess();
-            } else if ("ALREADY_SUBSCRIBED".equals(result)) {
-                Toast.makeText(fragment.getContext(), fragment.getString(R.string.toast_already_subscribed), Toast.LENGTH_LONG).show();
-                fragment.hideStatus();
             } else {
-                // Show detailed error message
-                String errorMsg = fragment.getString(R.string.error_subscribe);
-                if (result != null && result.startsWith("NETWORK_ERROR")) {
-                    errorMsg = fragment.getString(R.string.error_network);
-                } else if (result != null && result.startsWith("ERROR:")) {
-                    errorMsg = fragment.getString(R.string.error_subscribe_with_details, result.substring(7));
+                // Show error message based on result type (M1)
+                String errorMsg;
+                switch (result.getStatus()) {
+                    case NETWORK_ERROR:
+                        errorMsg = fragment.getString(R.string.error_network);
+                        break;
+                    case PARSE_ERROR:
+                    case UNKNOWN_ERROR:
+                        if (result.getErrorDetails() != null) {
+                            errorMsg = fragment.getString(R.string.error_subscribe_with_details, result.getErrorDetails());
+                        } else {
+                            errorMsg = fragment.getString(R.string.error_subscribe);
+                        }
+                        break;
+                    default:
+                        errorMsg = fragment.getString(R.string.error_subscribe);
+                        break;
                 }
                 Toast.makeText(fragment.getContext(), errorMsg, Toast.LENGTH_LONG).show();
                 fragment.hideStatus();
-                Log.e(TAG, "Subscribe failed with result: " + result);
-            }
-        }
-
-        /**
-         * Fetch RSS feed from the given URL using HttpURLConnection.
-         * @param feedUrl The URL of the RSS feed
-         * @return Parsed RssFeed object
-         * @throws IOException If network or I/O error occurs
-         * @throws XmlPullParserException If XML parsing error occurs
-         */
-        private RssFeed fetchFeed(String feedUrl) throws IOException, XmlPullParserException {
-            return fetchFeedWithRedirects(feedUrl, 5); // Allow up to 5 redirects
-        }
-
-        /**
-         * Fetch RSS feed with manual redirect following.
-         * HttpURLConnection doesn't follow HTTP -> HTTPS redirects by default.
-         */
-        private RssFeed fetchFeedWithRedirects(String feedUrl, int maxRedirects) throws IOException, XmlPullParserException {
-            if (maxRedirects <= 0) {
-                throw new IOException("Too many redirects");
-            }
-
-            URL url = new URL(feedUrl);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-
-            try {
-                connection.setRequestMethod("GET");
-                connection.setConnectTimeout(15000);
-                connection.setReadTimeout(15000);
-                connection.setRequestProperty("User-Agent", "Dumbcast/1.0");
-                connection.setInstanceFollowRedirects(false); // Handle redirects manually
-
-                int responseCode = connection.getResponseCode();
-
-                // Handle redirects (301, 302, 303, 307, 308)
-                if (responseCode >= 300 && responseCode < 400) {
-                    String newUrl = connection.getHeaderField("Location");
-                    if (newUrl == null) {
-                        throw new IOException("Redirect with no Location header");
-                    }
-
-                    Log.d(TAG, "Following redirect: " + feedUrl + " -> " + newUrl);
-                    connection.disconnect();
-                    return fetchFeedWithRedirects(newUrl, maxRedirects - 1);
-                }
-
-                if (responseCode != HttpURLConnection.HTTP_OK) {
-                    throw new IOException("HTTP error code: " + responseCode);
-                }
-
-                InputStream inputStream = connection.getInputStream();
-                RssParser parser = new RssParser();
-                return parser.parse(inputStream);
-            } finally {
-                connection.disconnect();
+                Log.e(TAG, "Subscribe failed: " + result.getStatus());
             }
         }
     }

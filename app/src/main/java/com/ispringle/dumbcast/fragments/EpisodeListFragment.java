@@ -19,9 +19,6 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 
 import com.ispringle.dumbcast.R;
 import com.ispringle.dumbcast.adapters.EpisodeAdapter;
@@ -35,7 +32,7 @@ import com.ispringle.dumbcast.data.PodcastRepository;
 import com.ispringle.dumbcast.services.DownloadService;
 import com.ispringle.dumbcast.services.PlaybackService;
 import com.ispringle.dumbcast.utils.RssFeed;
-import com.ispringle.dumbcast.utils.RssParser;
+import com.ispringle.dumbcast.utils.RssFeedUtils;
 
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -303,13 +300,26 @@ public class EpisodeListFragment extends Fragment {
     }
 
     /**
+     * Helper method to check if in preview mode and show appropriate message (M3).
+     * @param action The action being blocked (e.g., "play or download episodes")
+     * @return true if in preview mode, false otherwise
+     */
+    private boolean checkPreviewModeAndNotify(String action) {
+        if (isPreviewMode) {
+            String message = getString(R.string.toast_subscribe_to_interact, action);
+            Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * Handle click on an episode.
      * If downloaded, play it and navigate to PlayerFragment. If not downloaded, show message.
      */
     private void handleEpisodeClick(Episode episode) {
-        // In preview mode, disable playback/download actions
-        if (isPreviewMode) {
-            Toast.makeText(getContext(), "Subscribe to podcast to play or download episodes", Toast.LENGTH_SHORT).show();
+        // In preview mode, disable playback/download actions (M3)
+        if (checkPreviewModeAndNotify("play or download episodes")) {
             return;
         }
 
@@ -355,9 +365,8 @@ public class EpisodeListFragment extends Fragment {
      * Save to BACKLOG if not already in BACKLOG or LISTENED state.
      */
     private void handleEpisodeLongClick(Episode episode) {
-        // In preview mode, disable database actions
-        if (isPreviewMode) {
-            Toast.makeText(getContext(), "Subscribe to podcast to save to backlog", Toast.LENGTH_SHORT).show();
+        // In preview mode, disable database actions (M3)
+        if (checkPreviewModeAndNotify("save to backlog")) {
             return;
         }
 
@@ -390,9 +399,8 @@ public class EpisodeListFragment extends Fragment {
             return;
         }
 
-        // In preview mode, don't show context menu (no database actions available)
-        if (isPreviewMode) {
-            Toast.makeText(getContext(), "Subscribe to podcast to interact with episodes", Toast.LENGTH_SHORT).show();
+        // In preview mode, don't show context menu (no database actions available) (M3)
+        if (checkPreviewModeAndNotify("interact with episodes")) {
             return;
         }
 
@@ -744,8 +752,9 @@ public class EpisodeListFragment extends Fragment {
 
     /**
      * AsyncTask to load episodes from RSS feed for preview mode (without saving to database).
+     * Uses PreviewResult for proper error handling (I2) and RssFeedUtils for feed fetching (C1).
      */
-    private static class LoadPreviewEpisodesTask extends AsyncTask<Void, Void, EpisodeData> {
+    private static class LoadPreviewEpisodesTask extends AsyncTask<Void, Void, PreviewResult> {
         private final WeakReference<EpisodeListFragment> fragmentRef;
         private final String feedUrl;
         private final String podcastTitle;
@@ -757,12 +766,12 @@ public class EpisodeListFragment extends Fragment {
         }
 
         @Override
-        protected EpisodeData doInBackground(Void... voids) {
+        protected PreviewResult doInBackground(Void... voids) {
             try {
                 Log.d(TAG, "Loading preview episodes from: " + feedUrl);
 
-                // Fetch RSS feed
-                RssFeed feed = fetchFeedWithRedirects(feedUrl, 5);
+                // Fetch RSS feed using shared utility (C1)
+                RssFeed feed = RssFeedUtils.fetchFeed(feedUrl);
 
                 // Create temporary Episode objects (not saved to database)
                 List<Episode> episodes = new ArrayList<>();
@@ -788,62 +797,53 @@ public class EpisodeListFragment extends Fragment {
                 podcastCache.put(0L, tempPodcast);
 
                 Log.d(TAG, "Loaded " + episodes.size() + " preview episodes");
-                return new EpisodeData(episodes, podcastCache);
+                return PreviewResult.success(episodes, podcastCache);
+            } catch (IOException e) {
+                Log.e(TAG, "Network error loading preview episodes", e);
+                return PreviewResult.networkError(e.getMessage());
+            } catch (XmlPullParserException e) {
+                Log.e(TAG, "Parse error loading preview episodes", e);
+                return PreviewResult.parseError(e.getMessage());
             } catch (Exception e) {
-                Log.e(TAG, "Failed to load preview episodes", e);
-                return new EpisodeData(new ArrayList<Episode>(), new HashMap<Long, Podcast>());
+                Log.e(TAG, "Unknown error loading preview episodes", e);
+                return PreviewResult.unknownError(e.getMessage());
             }
         }
 
         @Override
-        protected void onPostExecute(EpisodeData data) {
+        protected void onPostExecute(PreviewResult result) {
             EpisodeListFragment fragment = fragmentRef.get();
-            if (fragment != null) {
+            if (fragment == null || fragment.getContext() == null) return;
+
+            if (result.isSuccess()) {
+                EpisodeData data = new EpisodeData(result.getEpisodes(), result.getPodcastCache());
                 fragment.updateEpisodeList(data);
-            }
-        }
-
-        /**
-         * Fetch RSS feed with manual redirect following.
-         */
-        private RssFeed fetchFeedWithRedirects(String feedUrl, int maxRedirects) throws IOException, XmlPullParserException {
-            if (maxRedirects <= 0) {
-                throw new IOException("Too many redirects");
-            }
-
-            URL url = new URL(feedUrl);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-
-            try {
-                connection.setRequestMethod("GET");
-                connection.setConnectTimeout(15000);
-                connection.setReadTimeout(15000);
-                connection.setRequestProperty("User-Agent", "Dumbcast/1.0");
-                connection.setInstanceFollowRedirects(false);
-
-                int responseCode = connection.getResponseCode();
-
-                // Handle redirects
-                if (responseCode >= 300 && responseCode < 400) {
-                    String newUrl = connection.getHeaderField("Location");
-                    if (newUrl == null) {
-                        throw new IOException("Redirect with no Location header");
-                    }
-
-                    Log.d(TAG, "Following redirect: " + feedUrl + " -> " + newUrl);
-                    connection.disconnect();
-                    return fetchFeedWithRedirects(newUrl, maxRedirects - 1);
+            } else {
+                // Show error message to user (I2)
+                String errorMsg;
+                switch (result.getStatus()) {
+                    case NETWORK_ERROR:
+                        errorMsg = fragment.getString(R.string.error_preview_network);
+                        break;
+                    case PARSE_ERROR:
+                        errorMsg = fragment.getString(R.string.error_preview_parse);
+                        break;
+                    case UNKNOWN_ERROR:
+                        if (result.getErrorMessage() != null) {
+                            errorMsg = fragment.getString(R.string.error_preview_unknown, result.getErrorMessage());
+                        } else {
+                            errorMsg = fragment.getString(R.string.error_preview_parse);
+                        }
+                        break;
+                    default:
+                        errorMsg = fragment.getString(R.string.error_preview_parse);
+                        break;
                 }
+                Toast.makeText(fragment.getContext(), errorMsg, Toast.LENGTH_LONG).show();
 
-                if (responseCode != HttpURLConnection.HTTP_OK) {
-                    throw new IOException("HTTP error code: " + responseCode);
-                }
-
-                InputStream inputStream = connection.getInputStream();
-                RssParser parser = new RssParser();
-                return parser.parse(inputStream);
-            } finally {
-                connection.disconnect();
+                // Show empty state
+                EpisodeData emptyData = new EpisodeData(new ArrayList<Episode>(), new HashMap<Long, Podcast>());
+                fragment.updateEpisodeList(emptyData);
             }
         }
     }

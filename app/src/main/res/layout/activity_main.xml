@@ -10,7 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="?attr/colorPrimary"
-        android:textAlignment="center"
+        android:gravity="center"
         android:textColor="?android:attr/textColorPrimaryInverse"
         android:textSize="18sp"
         android:textStyle="bold" />

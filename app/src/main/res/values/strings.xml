@@ -52,4 +52,8 @@
     <string name="podcast_info_episodes">Episodes: %d</string>
     <string name="podcast_info_description">Description:\n%s</string>
     <string name="error_subscribe_with_details">Error: %s</string>
+    <string name="error_preview_network">Failed to load episodes. Check your connection.</string>
+    <string name="error_preview_parse">Failed to parse podcast feed</string>
+    <string name="error_preview_unknown">Failed to load episodes: %s</string>
+    <string name="toast_subscribe_to_interact">Subscribe to podcast to %s</string>
 </resources>
