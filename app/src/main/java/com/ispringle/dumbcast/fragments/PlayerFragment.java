@@ -31,6 +31,7 @@ import com.ispringle.dumbcast.data.EpisodeRepository;
 import com.ispringle.dumbcast.data.Podcast;
 import com.ispringle.dumbcast.data.PodcastRepository;
 import com.ispringle.dumbcast.services.PlaybackService;
+import com.ispringle.dumbcast.utils.ImageLoader;
 
 import java.io.File;
 import java.lang.ref.WeakReference;
@@ -269,19 +270,26 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
         // Update episode info
         episodeTitleText.setText(currentEpisode.getTitle());
 
-        // Load podcast name
+        // Load podcast name and artwork
         Podcast podcast = podcastRepository.getPodcastById(currentEpisode.getPodcastId());
         if (podcast != null) {
             podcastNameText.setText(podcast.getTitle());
             podcastNameText.setVisibility(View.VISIBLE);
+
+            // Load artwork with fallback: try episode artwork first, fall back to podcast artwork
+            // Note: Episode.artworkUrl doesn't exist yet, so primaryUrl is always null for now
+            // This prepares the infrastructure for when episode-level artwork is added
+            String episodeArtworkUrl = null; // TODO: currentEpisode.getArtworkUrl() when field is added
+            String podcastArtworkUrl = podcast.getArtworkUrl();
+            ImageLoader.getInstance(getContext()).loadImageWithFallback(
+                getContext(), episodeArtworkUrl, podcastArtworkUrl, artworkImage);
         } else {
             podcastNameText.setVisibility(View.GONE);
-        }
 
-        // Set placeholder for artwork (actual image loading in Task 7)
-        // For now, just clear any previous image
-        artworkImage.setImageDrawable(null);
-        artworkImage.setBackgroundColor(ContextCompat.getColor(getContext(), R.color.artwork_placeholder));
+            // No podcast found, show placeholder
+            artworkImage.setImageDrawable(null);
+            artworkImage.setBackgroundColor(ContextCompat.getColor(getContext(), R.color.artwork_placeholder));
+        }
 
         // Update play/pause button
         if (playbackService.isPlaying()) {
