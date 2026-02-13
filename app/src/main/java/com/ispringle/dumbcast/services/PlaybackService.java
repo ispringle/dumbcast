@@ -48,12 +48,14 @@ public class PlaybackService extends Service {
     private static final int SKIP_BACKWARD_MS = 15000; // 15 seconds
     private static final int POSITION_UPDATE_INTERVAL_MS = 10000; // 10 seconds
 
-    // Actions for notification buttons
+    // Actions for notification buttons and service control
     public static final String ACTION_PLAY = "com.ispringle.dumbcast.ACTION_PLAY";
     public static final String ACTION_PAUSE = "com.ispringle.dumbcast.ACTION_PAUSE";
     public static final String ACTION_SKIP_FORWARD = "com.ispringle.dumbcast.ACTION_SKIP_FORWARD";
     public static final String ACTION_SKIP_BACKWARD = "com.ispringle.dumbcast.ACTION_SKIP_BACKWARD";
     public static final String ACTION_STOP = "com.ispringle.dumbcast.ACTION_STOP";
+    public static final String ACTION_LOAD_EPISODE = "LOAD_EPISODE";
+    public static final String EXTRA_EPISODE_ID = "episode_id";
 
     private MediaPlayer mediaPlayer;
     private PowerManager.WakeLock wakeLock;
@@ -160,7 +162,7 @@ public class PlaybackService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && intent.getAction() != null) {
-            handleAction(intent.getAction());
+            handleAction(intent.getAction(), intent);
         }
         return START_STICKY;
     }
@@ -550,10 +552,19 @@ public class PlaybackService extends Service {
     }
 
     /**
-     * Handle intent actions from notification buttons
+     * Handle intent actions from notification buttons and episode loading
      */
-    private void handleAction(String action) {
+    private void handleAction(String action, Intent intent) {
         switch (action) {
+            case ACTION_LOAD_EPISODE:
+                // Load episode by ID
+                if (intent != null && intent.hasExtra(EXTRA_EPISODE_ID)) {
+                    long episodeId = intent.getLongExtra(EXTRA_EPISODE_ID, -1);
+                    if (episodeId != -1) {
+                        loadEpisodeById(episodeId);
+                    }
+                }
+                break;
             case ACTION_PLAY:
                 play();
                 break;
@@ -570,6 +581,32 @@ public class PlaybackService extends Service {
                 stop();
                 stopSelf();
                 break;
+        }
+    }
+
+    /**
+     * Load an episode by ID from the database
+     */
+    private void loadEpisodeById(long episodeId) {
+        // Load episode on background thread
+        if (dbExecutor != null && !dbExecutor.isShutdown()) {
+            dbExecutor.execute(() -> {
+                try {
+                    Episode episode = episodeRepo.getEpisodeById(episodeId);
+                    if (episode != null) {
+                        // Load episode on main thread
+                        new android.os.Handler(getMainLooper()).post(() -> {
+                            loadEpisode(episode);
+                        });
+                    } else {
+                        Log.e(TAG, "Episode not found: " + episodeId);
+                        notifyError("Episode not found");
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error loading episode by ID", e);
+                    notifyError("Failed to load episode");
+                }
+            });
         }
     }
 

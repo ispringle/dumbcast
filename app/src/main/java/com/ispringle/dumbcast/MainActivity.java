@@ -9,6 +9,7 @@ import android.view.KeyEvent;
 
 import com.ispringle.dumbcast.data.DatabaseHelper;
 import com.ispringle.dumbcast.data.EpisodeRepository;
+import com.ispringle.dumbcast.fragments.PlayerFragment;
 import com.ispringle.dumbcast.fragments.SubscriptionsFragment;
 
 /**
@@ -135,6 +136,10 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         switch (keyCode) {
+            case KeyEvent.KEYCODE_0:
+                // 0 key: Navigate to PlayerFragment
+                loadFragment(PlayerFragment.newInstance());
+                return true;
             case KeyEvent.KEYCODE_DPAD_LEFT:
                 // Navigate to previous tab
                 navigateTab(-1);

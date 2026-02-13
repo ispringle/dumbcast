@@ -1,8 +1,10 @@
 package com.ispringle.dumbcast.fragments;
 
+import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentTransaction;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -20,6 +22,7 @@ import com.ispringle.dumbcast.data.EpisodeRepository;
 import com.ispringle.dumbcast.data.EpisodeState;
 import com.ispringle.dumbcast.data.Podcast;
 import com.ispringle.dumbcast.data.PodcastRepository;
+import com.ispringle.dumbcast.services.PlaybackService;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -192,16 +195,54 @@ public class EpisodeListFragment extends Fragment {
 
     /**
      * Handle click on an episode.
-     * If downloaded, play it. If not downloaded, download it.
+     * If downloaded, play it and navigate to PlayerFragment. If not downloaded, show message.
      */
     private void handleEpisodeClick(Episode episode) {
         if (episode.isDownloaded()) {
-            // TODO: Implement playback
-            Toast.makeText(getContext(), "Play: " + episode.getTitle(), Toast.LENGTH_SHORT).show();
+            // Start PlaybackService and load the episode
+            Intent serviceIntent = new Intent(getContext(), PlaybackService.class);
+            getContext().startService(serviceIntent);
+
+            // Load episode for playback (will be handled via service binding in PlayerFragment)
+            // For now, we'll just navigate and let the PlayerFragment handle the binding
+            // We need to pass the episode to the service before navigating
+            startPlaybackAndNavigate(episode);
         } else {
             // TODO: Implement download
-            Toast.makeText(getContext(), "Download: " + episode.getTitle(), Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "Episode not downloaded. Download functionality coming soon.", Toast.LENGTH_LONG).show();
         }
+    }
+
+    /**
+     * Start playback for an episode and navigate to PlayerFragment.
+     * This starts the service, loads the episode, and switches to the player view.
+     */
+    private void startPlaybackAndNavigate(final Episode episode) {
+        // Start the playback service
+        Intent serviceIntent = new Intent(getContext(), PlaybackService.class);
+        getContext().startService(serviceIntent);
+
+        // Give the service a moment to start, then navigate
+        // In a real implementation, we'd use a callback or binding, but this works for now
+        new android.os.Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                // Navigate to PlayerFragment
+                PlayerFragment playerFragment = PlayerFragment.newInstance();
+
+                // Load the episode into the playback service
+                Intent loadIntent = new Intent(getContext(), PlaybackService.class);
+                loadIntent.setAction(PlaybackService.ACTION_LOAD_EPISODE);
+                loadIntent.putExtra(PlaybackService.EXTRA_EPISODE_ID, episode.getId());
+                getContext().startService(loadIntent);
+
+                // Navigate to player
+                FragmentTransaction transaction = getActivity().getSupportFragmentManager().beginTransaction();
+                transaction.replace(R.id.fragment_container, playerFragment);
+                transaction.addToBackStack(null);
+                transaction.commit();
+            }
+        }, 100);
     }
 
     /**
