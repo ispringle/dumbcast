@@ -5,60 +5,49 @@
     android:orientation="vertical"
     android:padding="16dp"
     android:focusable="true"
-    android:focusableInTouchMode="true">
+    android:focusableInTouchMode="true"
+    android:gravity="center_horizontal">
 
-    <!-- Player title -->
-    <TextView
-        android:id="@+id/player_header"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Now Playing"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:paddingBottom="16dp" />
+    <!-- Episode/Podcast Image -->
+    <ImageView
+        android:id="@+id/player_artwork"
+        android:layout_width="160dp"
+        android:layout_height="160dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="16dp"
+        android:scaleType="centerCrop"
+        android:background="?android:attr/colorBackground"
+        android:contentDescription="Episode artwork" />
 
-    <!-- Episode title -->
+    <!-- Episode Title -->
     <TextView
         android:id="@+id/player_episode_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="No episode loaded"
-        android:textSize="18sp"
+        android:textSize="16sp"
         android:textStyle="bold"
-        android:paddingBottom="8dp" />
+        android:gravity="center"
+        android:singleLine="true"
+        android:ellipsize="marquee"
+        android:marqueeRepeatLimit="marquee_forever"
+        android:scrollHorizontally="true"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:paddingBottom="4dp" />
 
-    <!-- Podcast name -->
+    <!-- Podcast Name -->
     <TextView
         android:id="@+id/player_podcast_name"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text=""
-        android:textSize="14sp"
-        android:textColor="?android:attr/textColorSecondary"
-        android:paddingBottom="8dp" />
-
-    <!-- Current chapter (initially hidden) -->
-    <TextView
-        android:id="@+id/player_chapter_name"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text=""
         android:textSize="12sp"
         android:textColor="?android:attr/textColorSecondary"
-        android:paddingBottom="16dp"
-        android:visibility="gone" />
-
-    <!-- Progress text (current time / total duration) -->
-    <TextView
-        android:id="@+id/player_progress_text"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="00:00 / 00:00"
-        android:textSize="16sp"
         android:gravity="center"
-        android:paddingBottom="8dp" />
+        android:paddingBottom="16dp" />
 
-    <!-- Progress bar -->
+    <!-- Progress Bar -->
     <ProgressBar
         android:id="@+id/player_progress_bar"
         style="?android:attr/progressBarStyleHorizontal"
@@ -66,60 +55,43 @@
         android:layout_height="wrap_content"
         android:max="100"
         android:progress="0"
-        android:paddingBottom="24dp" />
+        android:paddingBottom="8dp" />
 
-    <!-- Control buttons -->
-    <LinearLayout
+    <!-- Time Display -->
+    <TextView
+        android:id="@+id/player_progress_text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
+        android:text="0:00 / 0:00"
+        android:textSize="14sp"
         android:gravity="center"
-        android:paddingBottom="16dp">
+        android:paddingBottom="24dp" />
 
-        <!-- Skip backward button -->
-        <TextView
-            android:id="@+id/player_skip_backward"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="⏪ 30s"
-            android:textSize="18sp"
-            android:gravity="center"
-            android:padding="12dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?android:attr/selectableItemBackground" />
+    <!-- Play/Pause Button -->
+    <TextView
+        android:id="@+id/player_play_pause"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="▶ Play"
+        android:textSize="20sp"
+        android:gravity="center"
+        android:padding="16dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?android:attr/selectableItemBackground"
+        android:textStyle="bold" />
 
-        <!-- Play/Pause button -->
-        <TextView
-            android:id="@+id/player_play_pause"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="▶ Play"
-            android:textSize="20sp"
-            android:gravity="center"
-            android:padding="12dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?android:attr/selectableItemBackground"
-            android:textStyle="bold" />
-
-        <!-- Skip forward button -->
-        <TextView
-            android:id="@+id/player_skip_forward"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="30s ⏩"
-            android:textSize="18sp"
-            android:gravity="center"
-            android:padding="12dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:background="?android:attr/selectableItemBackground" />
-
-    </LinearLayout>
+    <!-- Current chapter (initially hidden, kept for future use) -->
+    <TextView
+        android:id="@+id/player_chapter_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textSize="12sp"
+        android:textColor="?android:attr/textColorSecondary"
+        android:gravity="center"
+        android:paddingTop="16dp"
+        android:visibility="gone" />
 
     <!-- Status message -->
     <TextView
@@ -130,6 +102,7 @@
         android:textSize="14sp"
         android:textColor="?android:attr/textColorSecondary"
         android:gravity="center"
+        android:paddingTop="16dp"
         android:visibility="gone" />
 
 </LinearLayout>

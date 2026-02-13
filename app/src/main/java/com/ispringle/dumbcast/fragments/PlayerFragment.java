@@ -17,6 +17,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -54,13 +55,12 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
     private static final String TAG = "PlayerFragment";
 
     // UI Components
+    private ImageView artworkImage;
     private TextView episodeTitleText;
     private TextView podcastNameText;
     private TextView chapterNameText;
     private TextView progressText;
     private TextView playPauseButton;
-    private TextView skipBackwardButton;
-    private TextView skipForwardButton;
     private TextView statusMessage;
     private ProgressBar progressBar;
 
@@ -96,35 +96,23 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
         View view = inflater.inflate(R.layout.fragment_player, container, false);
 
         // Initialize UI components
+        artworkImage = view.findViewById(R.id.player_artwork);
         episodeTitleText = view.findViewById(R.id.player_episode_title);
         podcastNameText = view.findViewById(R.id.player_podcast_name);
         chapterNameText = view.findViewById(R.id.player_chapter_name);
         progressText = view.findViewById(R.id.player_progress_text);
         playPauseButton = view.findViewById(R.id.player_play_pause);
-        skipBackwardButton = view.findViewById(R.id.player_skip_backward);
-        skipForwardButton = view.findViewById(R.id.player_skip_forward);
         statusMessage = view.findViewById(R.id.player_status_message);
         progressBar = view.findViewById(R.id.player_progress_bar);
+
+        // Enable marquee effect for episode title
+        episodeTitleText.setSelected(true);
 
         // Set up click listeners
         playPauseButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 togglePlayPause();
-            }
-        });
-
-        skipBackwardButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                skipBackward();
-            }
-        });
-
-        skipForwardButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                skipForward();
             }
         });
 
@@ -287,6 +275,11 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
             podcastNameText.setVisibility(View.GONE);
         }
 
+        // Set placeholder for artwork (actual image loading in Task 7)
+        // For now, just clear any previous image
+        artworkImage.setImageDrawable(null);
+        artworkImage.setBackgroundColor(0xFF424242); // Dark gray placeholder
+
         // Update play/pause button
         if (playbackService.isPlaying()) {
             playPauseButton.setText("⏸ Pause");
@@ -307,10 +300,12 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
      * Show "no episode loaded" state
      */
     private void showNoEpisodeState() {
+        artworkImage.setImageDrawable(null);
+        artworkImage.setBackgroundColor(0xFF424242); // Dark gray placeholder
         episodeTitleText.setText("No episode loaded");
         podcastNameText.setVisibility(View.GONE);
         chapterNameText.setVisibility(View.GONE);
-        progressText.setText("00:00 / 00:00");
+        progressText.setText("0:00 / 0:00");
         progressBar.setProgress(0);
         playPauseButton.setText("▶ Play");
         statusMessage.setText("Load an episode to start playback");
