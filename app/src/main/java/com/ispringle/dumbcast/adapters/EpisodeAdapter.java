@@ -91,9 +91,9 @@ public class EpisodeAdapter extends ArrayAdapter<Episode> {
                 holder.stateBadge.setVisibility(View.GONE);
             }
 
-            // Set download status
+            // Set download status (badge style like NEW/BACKLOG)
             if (episode.isDownloaded()) {
-                holder.downloadStatus.setText("Downloaded");
+                holder.downloadStatus.setText("DL");
                 holder.downloadStatus.setVisibility(View.VISIBLE);
             } else {
                 holder.downloadStatus.setVisibility(View.GONE);

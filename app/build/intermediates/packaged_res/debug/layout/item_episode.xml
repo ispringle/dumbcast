@@ -69,9 +69,13 @@
                 android:id="@+id/episode_download_status"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="12sp"
-                android:textColor="?android:attr/textColorSecondary"
-                android:layout_marginStart="8dp" />
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:padding="4dp"
+                android:background="#FFE0E0E0"
+                android:textColor="#FF000000"
+                android:layout_marginStart="8dp"
+                android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>
 
