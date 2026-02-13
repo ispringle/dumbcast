@@ -278,10 +278,19 @@ public class SubscriptionsFragment extends Fragment {
     }
 
     /**
-     * Refresh all podcasts (stub implementation).
+     * Refresh all podcasts by fetching RSS feeds and adding new episodes.
+     * Shows progress for each podcast and a final summary.
      */
     private void refreshAllPodcasts() {
-        Toast.makeText(getContext(), getString(R.string.toast_refresh_all), Toast.LENGTH_SHORT).show();
+        if (getContext() == null) {
+            return;
+        }
+
+        // Show starting toast
+        Toast.makeText(getContext(), getString(R.string.toast_refreshing_all), Toast.LENGTH_SHORT).show();
+
+        // Start async task to refresh all podcasts
+        new RefreshAllPodcastsTask(this, podcastRepository, episodeRepository).execute();
     }
 
     /**
@@ -511,6 +520,196 @@ public class SubscriptionsFragment extends Fragment {
                     String errorMessage = fragment.getString(R.string.toast_refresh_error, result.errorMessage);
                     Toast.makeText(fragment.getContext(), errorMessage, Toast.LENGTH_LONG).show();
                     break;
+            }
+        }
+    }
+
+    /**
+     * Result class for refresh all podcasts operation.
+     */
+    private static class RefreshAllResult {
+        int totalNewEpisodes;
+        int successCount;
+        int failCount;
+
+        RefreshAllResult(int totalNewEpisodes, int successCount, int failCount) {
+            this.totalNewEpisodes = totalNewEpisodes;
+            this.successCount = successCount;
+            this.failCount = failCount;
+        }
+    }
+
+    /**
+     * AsyncTask to refresh all podcasts sequentially.
+     * Publishes progress updates for each podcast and shows a final summary.
+     */
+    private static class RefreshAllPodcastsTask extends AsyncTask<Void, String, RefreshAllResult> {
+        private final WeakReference<SubscriptionsFragment> fragmentRef;
+        private final PodcastRepository podcastRepository;
+        private final EpisodeRepository episodeRepository;
+
+        RefreshAllPodcastsTask(SubscriptionsFragment fragment, PodcastRepository podcastRepository, EpisodeRepository episodeRepository) {
+            this.fragmentRef = new WeakReference<>(fragment);
+            this.podcastRepository = podcastRepository;
+            this.episodeRepository = episodeRepository;
+        }
+
+        @Override
+        protected RefreshAllResult doInBackground(Void... voids) {
+            // Get all podcasts
+            List<Podcast> podcasts = podcastRepository.getAllPodcasts();
+
+            int totalNewEpisodes = 0;
+            int successCount = 0;
+            int failCount = 0;
+
+            // Iterate through each podcast
+            for (Podcast podcast : podcasts) {
+                try {
+                    // Fetch RSS feed
+                    RssFeed feed = RssFeedUtils.fetchFeed(podcast.getFeedUrl());
+
+                    // Process each episode from the feed
+                    int newEpisodeCount = 0;
+                    long now = System.currentTimeMillis();
+
+                    for (RssFeed.RssItem item : feed.getItems()) {
+                        // Skip if no GUID (required for duplicate detection)
+                        if (item.getGuid() == null || item.getGuid().isEmpty()) {
+                            Log.w(TAG, "Skipping episode without GUID: " + item.getTitle());
+                            continue;
+                        }
+
+                        // Check if episode already exists
+                        if (episodeRepository.episodeExists(podcast.getId(), item.getGuid())) {
+                            continue;
+                        }
+
+                        // Create new episode
+                        Episode episode = new Episode(
+                            podcast.getId(),
+                            item.getGuid(),
+                            item.getTitle(),
+                            item.getEnclosureUrl(),
+                            item.getPublishedAt()
+                        );
+
+                        // Set optional fields
+                        episode.setDescription(item.getDescription());
+                        episode.setEnclosureType(item.getEnclosureType());
+                        episode.setEnclosureLength(item.getEnclosureLength());
+                        episode.setDuration(item.getDuration());
+                        episode.setChaptersUrl(item.getChaptersUrl());
+                        episode.setFetchedAt(now);
+                        episode.setState(EpisodeState.NEW);
+
+                        // Insert into database
+                        long result = episodeRepository.insertEpisode(episode);
+                        if (result != -1) {
+                            newEpisodeCount++;
+                        }
+                    }
+
+                    // Update last refresh timestamp
+                    updateLastRefreshTimestamp(podcast.getId());
+
+                    // Track success
+                    totalNewEpisodes += newEpisodeCount;
+                    successCount++;
+
+                    // Publish progress update
+                    publishProgress(podcast.getTitle() + ":" + newEpisodeCount);
+
+                } catch (IOException e) {
+                    Log.e(TAG, "Network error while refreshing podcast: " + podcast.getTitle(), e);
+                    failCount++;
+                    publishProgress(podcast.getTitle() + ":error");
+                } catch (XmlPullParserException e) {
+                    Log.e(TAG, "Parse error while refreshing podcast: " + podcast.getTitle(), e);
+                    failCount++;
+                    publishProgress(podcast.getTitle() + ":error");
+                } catch (Exception e) {
+                    Log.e(TAG, "Unknown error while refreshing podcast: " + podcast.getTitle(), e);
+                    failCount++;
+                    publishProgress(podcast.getTitle() + ":error");
+                }
+            }
+
+            return new RefreshAllResult(totalNewEpisodes, successCount, failCount);
+        }
+
+        /**
+         * Update the last refresh timestamp for a podcast.
+         * @param podcastId The ID of the podcast
+         */
+        private void updateLastRefreshTimestamp(long podcastId) {
+            SubscriptionsFragment fragment = fragmentRef.get();
+            if (fragment != null && fragment.getContext() != null) {
+                DatabaseHelper dbHelper = DatabaseManager.getInstance(fragment.getContext());
+                android.content.ContentValues values = new android.content.ContentValues();
+                values.put(DatabaseHelper.COL_PODCAST_LAST_REFRESH, System.currentTimeMillis());
+
+                android.database.sqlite.SQLiteDatabase db = dbHelper.getWritableDatabase();
+                db.update(
+                    DatabaseHelper.TABLE_PODCASTS,
+                    values,
+                    DatabaseHelper.COL_PODCAST_ID + " = ?",
+                    new String[]{String.valueOf(podcastId)}
+                );
+            }
+        }
+
+        @Override
+        protected void onProgressUpdate(String... values) {
+            SubscriptionsFragment fragment = fragmentRef.get();
+            if (fragment == null || fragment.getContext() == null || values.length == 0) {
+                return;
+            }
+
+            // Parse progress update (format: "PodcastTitle:count" or "PodcastTitle:error")
+            String update = values[0];
+            String[] parts = update.split(":", 2);
+            if (parts.length == 2) {
+                String podcastTitle = parts[0];
+                String countStr = parts[1];
+
+                if ("error".equals(countStr)) {
+                    // Don't show error toasts during refresh - they'll be in the summary
+                    return;
+                } else {
+                    try {
+                        int count = Integer.parseInt(countStr);
+                        if (count > 0) {
+                            String message = fragment.getString(R.string.toast_refresh_all_progress, podcastTitle, count);
+                            Toast.makeText(fragment.getContext(), message, Toast.LENGTH_SHORT).show();
+                        }
+                    } catch (NumberFormatException e) {
+                        Log.e(TAG, "Failed to parse episode count: " + countStr, e);
+                    }
+                }
+            }
+        }
+
+        @Override
+        protected void onPostExecute(RefreshAllResult result) {
+            SubscriptionsFragment fragment = fragmentRef.get();
+            if (fragment == null || fragment.getContext() == null) {
+                return;
+            }
+
+            // Show final summary toast
+            int totalPodcasts = result.successCount + result.failCount;
+            String message = fragment.getString(
+                R.string.toast_refresh_all_complete,
+                result.totalNewEpisodes,
+                result.successCount,
+                totalPodcasts
+            );
+            Toast.makeText(fragment.getContext(), message, Toast.LENGTH_LONG).show();
+
+            // Refresh the podcast list to update episode counts
+            if (result.totalNewEpisodes > 0) {
+                fragment.loadPodcasts();
             }
         }
     }

@@ -47,6 +47,9 @@
     <string name="toast_refresh_network_error">Network error. Check connection.</string>
     <string name="toast_refresh_parse_error">Failed to parse podcast feed</string>
     <string name="toast_refresh_error">Refresh failed: %s</string>
+    <string name="toast_refreshing_all">Refreshing all podcasts...</string>
+    <string name="toast_refresh_all_progress">%1$s: %2$d new</string>
+    <string name="toast_refresh_all_complete">Complete: %1$d new episodes (%2$d/%3$d succeeded)</string>
     <string name="dialog_delete_download_title">Delete Download</string>
     <string name="dialog_delete_download_message">Delete downloaded file for \"%s\"?</string>
     <string name="dialog_delete">Delete</string>
