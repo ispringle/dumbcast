@@ -89,4 +89,12 @@
     <!-- Player Show Notes -->
     <string name="player_show_notes_title">Show Notes</string>
     <string name="player_no_show_notes">No show notes available</string>
+
+    <!-- Player UI -->
+    <string name="no_episode_loaded">No episode loaded</string>
+    <string name="button_pause">⏸ Pause</string>
+    <string name="button_play">▶ Play</string>
+    <string name="time_default">0:00 / 0:00</string>
+    <string name="load_episode_message">Load an episode to start playback</string>
+    <string name="artwork_description">Episode artwork</string>
 </resources>

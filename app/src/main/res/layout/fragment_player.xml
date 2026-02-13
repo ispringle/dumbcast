@@ -17,14 +17,14 @@
         android:layout_marginBottom="16dp"
         android:scaleType="centerCrop"
         android:background="?android:attr/colorBackground"
-        android:contentDescription="Episode artwork" />
+        android:contentDescription="@string/artwork_description" />
 
     <!-- Episode Title -->
     <TextView
         android:id="@+id/player_episode_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="No episode loaded"
+        android:text="@string/no_episode_loaded"
         android:textSize="16sp"
         android:textStyle="bold"
         android:gravity="center"
@@ -62,7 +62,7 @@
         android:id="@+id/player_progress_text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="0:00 / 0:00"
+        android:text="@string/time_default"
         android:textSize="14sp"
         android:gravity="center"
         android:paddingBottom="24dp" />
@@ -72,7 +72,7 @@
         android:id="@+id/player_play_pause"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="▶ Play"
+        android:text="@string/button_play"
         android:textSize="20sp"
         android:gravity="center"
         android:padding="16dp"

@@ -10,6 +10,7 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.support.v4.app.Fragment;
+import android.support.v4.content.ContextCompat;
 import android.text.InputType;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -85,6 +86,8 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
         super.onCreate(savedInstanceState);
 
         // Initialize repositories using singleton DatabaseHelper
+        // DatabaseManager is a singleton that handles the database lifecycle
+        // No explicit cleanup needed in onDestroy() as the singleton persists across app lifecycle
         DatabaseHelper dbHelper = DatabaseManager.getInstance(getContext());
         podcastRepository = new PodcastRepository(dbHelper);
         episodeRepository = new EpisodeRepository(dbHelper);
@@ -278,13 +281,13 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
         // Set placeholder for artwork (actual image loading in Task 7)
         // For now, just clear any previous image
         artworkImage.setImageDrawable(null);
-        artworkImage.setBackgroundColor(0xFF424242); // Dark gray placeholder
+        artworkImage.setBackgroundColor(ContextCompat.getColor(getContext(), R.color.artwork_placeholder));
 
         // Update play/pause button
         if (playbackService.isPlaying()) {
-            playPauseButton.setText("⏸ Pause");
+            playPauseButton.setText(R.string.button_pause);
         } else {
-            playPauseButton.setText("▶ Play");
+            playPauseButton.setText(R.string.button_play);
         }
 
         // Update progress
@@ -301,14 +304,14 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
      */
     private void showNoEpisodeState() {
         artworkImage.setImageDrawable(null);
-        artworkImage.setBackgroundColor(0xFF424242); // Dark gray placeholder
-        episodeTitleText.setText("No episode loaded");
+        artworkImage.setBackgroundColor(ContextCompat.getColor(getContext(), R.color.artwork_placeholder));
+        episodeTitleText.setText(R.string.no_episode_loaded);
         podcastNameText.setVisibility(View.GONE);
         chapterNameText.setVisibility(View.GONE);
-        progressText.setText("0:00 / 0:00");
+        progressText.setText(R.string.time_default);
         progressBar.setProgress(0);
-        playPauseButton.setText("▶ Play");
-        statusMessage.setText("Load an episode to start playback");
+        playPauseButton.setText(R.string.button_play);
+        statusMessage.setText(R.string.load_episode_message);
         statusMessage.setVisibility(View.VISIBLE);
     }
 
@@ -361,7 +364,7 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
             getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    playPauseButton.setText("⏸ Pause");
+                    playPauseButton.setText(R.string.button_pause);
                 }
             });
         }
@@ -374,7 +377,7 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
             getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    playPauseButton.setText("▶ Play");
+                    playPauseButton.setText(R.string.button_play);
                 }
             });
         }
@@ -400,7 +403,7 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
             getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    playPauseButton.setText("▶ Play");
+                    playPauseButton.setText(R.string.button_play);
                     statusMessage.setText("Finished");
                     statusMessage.setVisibility(View.VISIBLE);
                     Toast.makeText(getContext(), "Episode finished", Toast.LENGTH_SHORT).show();
