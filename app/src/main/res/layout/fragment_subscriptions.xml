@@ -6,13 +6,15 @@
     android:padding="16dp">
 
     <TextView
-        android:id="@+id/subscriptions_title"
+        android:id="@+id/subscriptions_empty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/subscriptions_title"
-        android:textSize="24sp"
-        android:textStyle="bold"
-        android:paddingBottom="16dp" />
+        android:text="No subscriptions yet"
+        android:textSize="14sp"
+        android:textColor="?android:attr/textColorSecondary"
+        android:gravity="center"
+        android:padding="32dp"
+        android:visibility="gone" />
 
     <ListView
         android:id="@+id/subscriptions_list"

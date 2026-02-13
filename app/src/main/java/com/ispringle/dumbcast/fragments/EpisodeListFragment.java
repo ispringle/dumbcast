@@ -63,7 +63,6 @@ public class EpisodeListFragment extends Fragment {
     private static final String ARG_PREVIEW_TITLE = "preview_title";
 
     private ListView listView;
-    private TextView titleText;
     private TextView emptyText;
     private EpisodeAdapter adapter;
     private EpisodeRepository episodeRepository;
@@ -164,11 +163,7 @@ public class EpisodeListFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_episode_list, container, false);
 
         listView = view.findViewById(R.id.episode_list);
-        titleText = view.findViewById(R.id.episode_list_title);
         emptyText = view.findViewById(R.id.episode_list_empty);
-
-        // Set title based on filter type
-        updateTitle();
 
         // Initialize adapter with empty list and empty podcast cache
         adapter = new EpisodeAdapter(getContext(), new ArrayList<Episode>(), new HashMap<Long, Podcast>());
@@ -237,22 +232,6 @@ public class EpisodeListFragment extends Fragment {
         super.onResume();
         // Refresh data when fragment becomes visible
         loadEpisodes();
-    }
-
-    /**
-     * Update the fragment title based on the filter type.
-     */
-    private void updateTitle() {
-        if (isPreviewMode) {
-            titleText.setText(previewTitle + " (Preview)");
-        } else if (podcastId != -1) {
-            // Load podcast name asynchronously
-            new LoadPodcastTitleTask(this, podcastRepository, titleText).execute(podcastId);
-        } else if (episodeState != null) {
-            titleText.setText(episodeState.name() + " Episodes");
-        } else {
-            titleText.setText("Episodes");
-        }
     }
 
     /**
@@ -601,35 +580,6 @@ public class EpisodeListFragment extends Fragment {
             EpisodeListFragment fragment = fragmentRef.get();
             if (fragment != null && data != null) {
                 fragment.updateEpisodeList(data);
-            }
-        }
-    }
-
-    /**
-     * AsyncTask to load podcast title on a background thread.
-     */
-    private static class LoadPodcastTitleTask extends AsyncTask<Long, Void, String> {
-        private final WeakReference<EpisodeListFragment> fragmentRef;
-        private final PodcastRepository repository;
-        private final TextView titleView;
-
-        LoadPodcastTitleTask(EpisodeListFragment fragment, PodcastRepository repository, TextView titleView) {
-            this.fragmentRef = new WeakReference<>(fragment);
-            this.repository = repository;
-            this.titleView = titleView;
-        }
-
-        @Override
-        protected String doInBackground(Long... params) {
-            long podcastId = params[0];
-            Podcast podcast = repository.getPodcastById(podcastId);
-            return podcast != null ? podcast.getTitle() : "Episodes";
-        }
-
-        @Override
-        protected void onPostExecute(String title) {
-            if (titleView != null) {
-                titleView.setText(title);
             }
         }
     }

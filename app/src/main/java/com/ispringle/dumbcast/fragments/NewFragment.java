@@ -71,8 +71,8 @@ public class NewFragment extends Fragment {
 
         listView = view.findViewById(R.id.subscriptions_list);
 
-        // Add empty state text (reusing the title TextView for now)
-        emptyText = view.findViewById(R.id.subscriptions_title);
+        // Add empty state text
+        emptyText = view.findViewById(R.id.subscriptions_empty);
 
         // Initialize adapter with empty list and empty count map
         adapter = new PodcastAdapter(getContext(), new ArrayList<Podcast>(), new HashMap<Long, Integer>());
@@ -175,11 +175,12 @@ public class NewFragment extends Fragment {
         adapter = new PodcastAdapter(getContext(), data.podcasts, data.episodeCounts);
         listView.setAdapter(adapter);
 
-        // Show message if no podcasts
+        // Show/hide empty message (will say "No new episodes")
         if (data.podcasts.isEmpty()) {
-            emptyText.setText("No subscriptions yet");
+            emptyText.setVisibility(View.VISIBLE);
+            emptyText.setText("No new episodes");
         } else {
-            emptyText.setText(R.string.subscriptions_title);
+            emptyText.setVisibility(View.GONE);
         }
 
         Log.d(TAG, "Loaded " + data.podcasts.size() + " podcasts");

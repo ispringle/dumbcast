@@ -11,6 +11,7 @@ import com.ispringle.dumbcast.data.DatabaseHelper;
 import com.ispringle.dumbcast.data.DatabaseManager;
 import com.ispringle.dumbcast.data.EpisodeRepository;
 import com.ispringle.dumbcast.data.EpisodeState;
+import com.ispringle.dumbcast.data.PodcastRepository;
 import com.ispringle.dumbcast.fragments.DiscoveryFragment;
 import com.ispringle.dumbcast.fragments.EpisodeListFragment;
 import com.ispringle.dumbcast.fragments.NewFragment;
@@ -46,6 +47,15 @@ public class MainActivity extends AppCompatActivity {
         // Initialize database and repository using singleton
         DatabaseHelper dbHelper = DatabaseManager.getInstance(this);
         episodeRepository = new EpisodeRepository(dbHelper);
+        PodcastRepository podcastRepository = new PodcastRepository(dbHelper);
+
+        // On first launch, check if there are any subscriptions
+        // If none, start on Discovery tab instead of Subscriptions
+        if (savedInstanceState == null) {
+            if (podcastRepository.getAllPodcasts().isEmpty()) {
+                currentTab = TAB_DISCOVER;
+            }
+        }
 
         // Run episode maintenance on background thread to avoid blocking app startup
         new Thread(new Runnable() {
