@@ -189,6 +189,64 @@ public class EpisodeRepository {
     }
 
     /**
+     * Get all episodes for a specific podcast.
+     * @param podcastId The podcast ID to filter by
+     * @return List of episodes for the podcast, ordered by published date (newest first)
+     */
+    public List<Episode> getEpisodesByPodcast(long podcastId) {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        List<Episode> episodes = new ArrayList<>();
+
+        Cursor cursor = db.query(
+            DatabaseHelper.TABLE_EPISODES,
+            null,
+            DatabaseHelper.COL_EPISODE_PODCAST_ID + " = ?",
+            new String[]{String.valueOf(podcastId)},
+            null,
+            null,
+            DatabaseHelper.COL_EPISODE_PUBLISHED_AT + " DESC"
+        );
+
+        if (cursor != null) {
+            while (cursor.moveToNext()) {
+                episodes.add(cursorToEpisode(cursor));
+            }
+            cursor.close();
+        }
+
+        return episodes;
+    }
+
+    /**
+     * Get the count of episodes for a specific podcast.
+     * @param podcastId The podcast ID
+     * @return The number of episodes for the podcast
+     */
+    public int getEpisodeCountByPodcast(long podcastId) {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        int count = 0;
+
+        Cursor cursor = db.query(
+            DatabaseHelper.TABLE_EPISODES,
+            new String[]{"COUNT(*) as count"},
+            DatabaseHelper.COL_EPISODE_PODCAST_ID + " = ?",
+            new String[]{String.valueOf(podcastId)},
+            null,
+            null,
+            null
+        );
+
+        if (cursor != null) {
+            if (cursor.moveToFirst()) {
+                count = cursor.getInt(0);
+            }
+            cursor.close();
+        }
+
+        return count;
+    }
+
+    /**
      * Convert an Episode object to ContentValues for database insertion/update.
      * @param episode The episode to convert
      * @return ContentValues containing episode data
