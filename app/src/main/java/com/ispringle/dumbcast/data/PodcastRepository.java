@@ -187,8 +187,40 @@ public class PodcastRepository {
         // Update podcast metadata from feed
         updatePodcastFromFeed(podcast, feed);
 
-        // Insert new episodes from feed
-        insertEpisodesFromFeed(podcastId, feed);
+        // Insert new episodes from feed (limit to 10 most recent)
+        insertEpisodesFromFeed(podcastId, feed, 10);
+
+        // Update last refresh timestamp
+        updateLastRefresh(podcastId);
+
+        Log.d(TAG, "Successfully refreshed podcast: " + podcast.getTitle());
+    }
+
+    /**
+     * Refresh a podcast's feed with a custom episode limit.
+     * Use this for "Load More Episodes" functionality.
+     * @param podcastId The ID of the podcast to refresh
+     * @param maxNewEpisodes Maximum number of new episodes to fetch (0 = unlimited)
+     * @throws IOException If network or I/O error occurs
+     * @throws XmlPullParserException If XML parsing error occurs
+     */
+    public void refreshPodcastWithLimit(long podcastId, int maxNewEpisodes) throws IOException, XmlPullParserException {
+        Podcast podcast = getPodcastById(podcastId);
+        if (podcast == null) {
+            Log.e(TAG, "Cannot refresh: Podcast not found (ID: " + podcastId + ")");
+            return;
+        }
+
+        Log.d(TAG, "Refreshing podcast with limit " + maxNewEpisodes + ": " + podcast.getTitle());
+
+        // Fetch and parse RSS feed
+        RssFeed feed = fetchFeed(podcast.getFeedUrl());
+
+        // Update podcast metadata from feed
+        updatePodcastFromFeed(podcast, feed);
+
+        // Insert new episodes from feed with custom limit
+        insertEpisodesFromFeed(podcastId, feed, maxNewEpisodes);
 
         // Update last refresh timestamp
         updateLastRefresh(podcastId);
@@ -335,8 +367,9 @@ public class PodcastRepository {
      * Sets session grace for episodes published more than 7 days ago on first fetch.
      * @param podcastId The ID of the podcast
      * @param feed The RSS feed containing episodes
+     * @param maxNewEpisodes Maximum number of NEW episodes to insert (0 = unlimited)
      */
-    private void insertEpisodesFromFeed(long podcastId, RssFeed feed) {
+    private void insertEpisodesFromFeed(long podcastId, RssFeed feed, int maxNewEpisodes) {
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         long now = System.currentTimeMillis();
         int newEpisodeCount = 0;
@@ -344,7 +377,7 @@ public class PodcastRepository {
         int consecutiveDuplicates = 0;
         final int DUPLICATE_THRESHOLD = 10; // Stop after 10 consecutive duplicates
 
-        Log.d(TAG, "Processing " + feed.getItems().size() + " items from feed for podcast ID: " + podcastId);
+        Log.d(TAG, "Processing " + feed.getItems().size() + " items from feed for podcast ID: " + podcastId + " (max new: " + maxNewEpisodes + ")");
 
         db.beginTransaction();
         try {
@@ -353,6 +386,12 @@ public class PodcastRepository {
                 // This prevents re-processing thousands of old episodes on refresh
                 if (consecutiveDuplicates >= DUPLICATE_THRESHOLD) {
                     Log.d(TAG, "Stopping early: encountered " + DUPLICATE_THRESHOLD + " consecutive duplicates (total processed: " + (newEpisodeCount + skippedCount) + ")");
+                    break;
+                }
+
+                // Stop processing if we've reached the maximum number of new episodes
+                if (maxNewEpisodes > 0 && newEpisodeCount >= maxNewEpisodes) {
+                    Log.d(TAG, "Stopping: reached maximum new episodes limit of " + maxNewEpisodes);
                     break;
                 }
                 // Only require title - GUID and enclosureUrl are now optional
@@ -401,7 +440,8 @@ public class PodcastRepository {
                 );
 
                 // Set optional fields
-                episode.setDescription(item.getDescription());
+                // NOTE: Skip description for non-downloaded episodes to save DB space
+                // Description will be stored when episode is downloaded
                 episode.setEnclosureType(item.getEnclosureType());
                 episode.setEnclosureLength(item.getEnclosureLength());
                 episode.setDuration(item.getDuration());

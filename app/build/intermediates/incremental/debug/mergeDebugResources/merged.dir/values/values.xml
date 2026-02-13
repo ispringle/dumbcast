@@ -310,8 +310,8 @@
     <string name="appbar_scrolling_view_behavior" translatable="false">android.support.design.widget.AppBarLayout$ScrollingViewBehavior</string>
     <string name="artwork_description">Episode artwork</string>
     <string name="bottom_sheet_behavior" translatable="false">android.support.design.widget.BottomSheetBehavior</string>
-    <string name="button_pause">⏸ Pause</string>
-    <string name="button_play">▶ Play</string>
+    <string name="button_pause">Pause</string>
+    <string name="button_play">Play</string>
     <string name="character_counter_pattern" translatable="false">%1$d / %2$d</string>
     <string name="dialog_cancel">Cancel</string>
     <string name="dialog_close">Close</string>

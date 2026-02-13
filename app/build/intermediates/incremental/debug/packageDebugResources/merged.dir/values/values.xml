@@ -3,8 +3,8 @@
     <color name="artwork_placeholder">#424242</color>
     <string name="app_name">dumbcast</string>
     <string name="artwork_description">Episode artwork</string>
-    <string name="button_pause">⏸ Pause</string>
-    <string name="button_play">▶ Play</string>
+    <string name="button_pause">Pause</string>
+    <string name="button_play">Play</string>
     <string name="dialog_cancel">Cancel</string>
     <string name="dialog_close">Close</string>
     <string name="dialog_delete">Delete</string>
