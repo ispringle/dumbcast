@@ -219,6 +219,12 @@ public class EpisodeListFragment extends Fragment {
                             }
                         }
                     }
+                } else if (keyCode == KeyEvent.KEYCODE_STAR) {
+                    // Show podcast settings menu when viewing a specific podcast
+                    if (event.getAction() == KeyEvent.ACTION_DOWN && podcastId != -1 && !isPreviewMode) {
+                        showPodcastSettings();
+                        return true;
+                    }
                 }
                 return false;
             }
@@ -363,6 +369,50 @@ public class EpisodeListFragment extends Fragment {
 
         // Save to backlog on background thread
         new SaveToBacklogTask(this, episodeRepository, episode).execute();
+    }
+
+    /**
+     * Show podcast settings menu (press * when viewing a podcast).
+     * Currently shows: Reverse Episode Order toggle
+     */
+    private void showPodcastSettings() {
+        if (getContext() == null || podcastId == -1) {
+            return;
+        }
+
+        // Get podcast to check current reverse order setting
+        final Podcast podcast = podcastRepository.getPodcastById(podcastId);
+        if (podcast == null) {
+            return;
+        }
+
+        final List<String> menuItems = new ArrayList<>();
+        String toggleLabel = podcast.isReverseOrder() ?
+            "✓ Reverse Episode Order" :
+            "Reverse Episode Order";
+        menuItems.add(toggleLabel);
+
+        final CharSequence[] items = menuItems.toArray(new CharSequence[0]);
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle("Podcast Settings");
+        builder.setItems(items, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                if (which == 0) {
+                    // Toggle reverse order
+                    boolean newReverseOrder = podcastRepository.toggleReverseOrder(podcastId);
+                    String message = newReverseOrder ?
+                        "Episodes will show oldest first" :
+                        "Episodes will show newest first";
+                    Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+                    // Reload episodes to apply new order
+                    loadEpisodes();
+                }
+            }
+        });
+        builder.setNegativeButton(R.string.dialog_cancel, null);
+        builder.show();
     }
 
     /**
@@ -542,15 +592,25 @@ public class EpisodeListFragment extends Fragment {
             Log.d(TAG, "LoadEpisodesTask - loading episodes for podcastId: " + fragment.podcastId + ", state: " + fragment.episodeState);
 
             List<Episode> episodes;
+            // Get podcast to check reverse order setting
+            Podcast podcast = null;
+            boolean reverseOrder = false;
+            if (fragment.podcastId != -1) {
+                podcast = podcastRepository.getPodcastById(fragment.podcastId);
+                if (podcast != null) {
+                    reverseOrder = podcast.isReverseOrder();
+                }
+            }
+
             if (fragment.podcastId != -1 && fragment.episodeState != null) {
                 // Load episodes by both podcast ID AND state
                 Log.d(TAG, "LoadEpisodesTask - calling getEpisodesByPodcastAndState(" + fragment.podcastId + ", " + fragment.episodeState + ")");
                 episodes = episodeRepository.getEpisodesByPodcastAndState(fragment.podcastId, fragment.episodeState);
                 Log.d(TAG, "LoadEpisodesTask - loaded " + episodes.size() + " episodes");
             } else if (fragment.podcastId != -1) {
-                // Load episodes by podcast ID only
-                Log.d(TAG, "LoadEpisodesTask - calling getEpisodesByPodcast(" + fragment.podcastId + ")");
-                episodes = episodeRepository.getEpisodesByPodcast(fragment.podcastId);
+                // Load episodes by podcast ID only (with reverse order if enabled)
+                Log.d(TAG, "LoadEpisodesTask - calling getEpisodesByPodcast(" + fragment.podcastId + ", reverseOrder=" + reverseOrder + ")");
+                episodes = episodeRepository.getEpisodesByPodcast(fragment.podcastId, reverseOrder);
                 Log.d(TAG, "LoadEpisodesTask - loaded " + episodes.size() + " episodes");
             } else if (fragment.episodeState != null) {
                 // Load episodes by state only
@@ -565,9 +625,9 @@ public class EpisodeListFragment extends Fragment {
             for (Episode episode : episodes) {
                 long pid = episode.getPodcastId();
                 if (!podcastCache.containsKey(pid)) {
-                    Podcast podcast = podcastRepository.getPodcastById(pid);
-                    if (podcast != null) {
-                        podcastCache.put(pid, podcast);
+                    Podcast cachedPodcast = podcastRepository.getPodcastById(pid);
+                    if (cachedPodcast != null) {
+                        podcastCache.put(pid, cachedPodcast);
                     }
                 }
             }

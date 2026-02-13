@@ -9,6 +9,7 @@ public class Podcast {
     private Long podcastIndexId;
     private long lastRefreshAt;
     private long createdAt;
+    private boolean reverseOrder;
 
     // Constructor
     public Podcast(long id, String feedUrl, String title) {
@@ -42,4 +43,7 @@ public class Podcast {
 
     public long getCreatedAt() { return createdAt; }
     public void setCreatedAt(long createdAt) { this.createdAt = createdAt; }
+
+    public boolean isReverseOrder() { return reverseOrder; }
+    public void setReverseOrder(boolean reverseOrder) { this.reverseOrder = reverseOrder; }
 }

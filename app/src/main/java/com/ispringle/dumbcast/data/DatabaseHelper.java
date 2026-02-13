@@ -9,7 +9,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 public class DatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "dumbcast.db";
-    private static final int DATABASE_VERSION = 2;
+    private static final int DATABASE_VERSION = 3;
 
     // Table names
     public static final String TABLE_PODCASTS = "podcasts";
@@ -24,6 +24,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COL_PODCAST_INDEX_ID = "podcast_index_id";
     public static final String COL_PODCAST_LAST_REFRESH = "last_refresh_at";
     public static final String COL_PODCAST_CREATED = "created_at";
+    public static final String COL_PODCAST_REVERSE_ORDER = "reverse_order";
 
     // Episodes columns
     public static final String COL_EPISODE_ID = "id";
@@ -56,7 +57,8 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         COL_PODCAST_ARTWORK_URL + " TEXT, " +
         COL_PODCAST_INDEX_ID + " INTEGER, " +
         COL_PODCAST_LAST_REFRESH + " INTEGER, " +
-        COL_PODCAST_CREATED + " INTEGER NOT NULL)";
+        COL_PODCAST_CREATED + " INTEGER NOT NULL, " +
+        COL_PODCAST_REVERSE_ORDER + " INTEGER DEFAULT 0)";
 
     private static final String CREATE_EPISODES_TABLE =
         "CREATE TABLE " + TABLE_EPISODES + " (" +
@@ -161,6 +163,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             db.execSQL(CREATE_EPISODE_PODCAST_STATE_INDEX);
             db.execSQL(CREATE_EPISODE_FETCHED_INDEX);
             db.execSQL(CREATE_EPISODE_PUBLISHED_INDEX);
+        }
+
+        if (oldVersion < 3) {
+            // Migration from version 2 to 3: Add reverse_order column to podcasts
+            db.execSQL("ALTER TABLE " + TABLE_PODCASTS + " ADD COLUMN " +
+                COL_PODCAST_REVERSE_ORDER + " INTEGER DEFAULT 0");
         }
     }
 }

@@ -226,8 +226,22 @@ public class EpisodeRepository {
      * @return List of episodes for the podcast, ordered by published date (newest first)
      */
     public List<Episode> getEpisodesByPodcast(long podcastId) {
+        return getEpisodesByPodcast(podcastId, false);
+    }
+
+    /**
+     * Get all episodes for a specific podcast with optional reverse order.
+     * @param podcastId The podcast ID to filter by
+     * @param reverseOrder If true, order oldest first (for episodic podcasts)
+     * @return List of episodes for the podcast, ordered by published date
+     */
+    public List<Episode> getEpisodesByPodcast(long podcastId, boolean reverseOrder) {
         SQLiteDatabase db = dbHelper.getReadableDatabase();
         List<Episode> episodes = new ArrayList<>();
+
+        String orderBy = reverseOrder ?
+            DatabaseHelper.COL_EPISODE_PUBLISHED_AT + " ASC" :
+            DatabaseHelper.COL_EPISODE_PUBLISHED_AT + " DESC";
 
         Cursor cursor = db.query(
             DatabaseHelper.TABLE_EPISODES,
@@ -236,7 +250,7 @@ public class EpisodeRepository {
             new String[]{String.valueOf(podcastId)},
             null,
             null,
-            DatabaseHelper.COL_EPISODE_PUBLISHED_AT + " DESC"
+            orderBy
         );
 
         if (cursor != null) {

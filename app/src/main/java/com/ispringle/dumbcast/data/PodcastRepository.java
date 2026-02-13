@@ -560,6 +560,35 @@ public class PodcastRepository {
     }
 
     /**
+     * Toggle the reverse order setting for a podcast.
+     * @param podcastId The ID of the podcast
+     * @return true if the new state is reverse order, false otherwise
+     */
+    public boolean toggleReverseOrder(long podcastId) {
+        Podcast podcast = getPodcastById(podcastId);
+        if (podcast == null) {
+            return false;
+        }
+
+        // Toggle the setting
+        boolean newReverseOrder = !podcast.isReverseOrder();
+
+        // Update database
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(DatabaseHelper.COL_PODCAST_REVERSE_ORDER, newReverseOrder ? 1 : 0);
+
+        db.update(
+            DatabaseHelper.TABLE_PODCASTS,
+            values,
+            DatabaseHelper.COL_PODCAST_ID + " = ?",
+            new String[]{String.valueOf(podcastId)}
+        );
+
+        return newReverseOrder;
+    }
+
+    /**
      * Convert a Podcast object to ContentValues for database insertion/update.
      * @param podcast The podcast to convert
      * @return ContentValues containing podcast data
@@ -570,6 +599,7 @@ public class PodcastRepository {
         values.put(DatabaseHelper.COL_PODCAST_FEED_URL, podcast.getFeedUrl());
         values.put(DatabaseHelper.COL_PODCAST_TITLE, podcast.getTitle());
         values.put(DatabaseHelper.COL_PODCAST_CREATED, podcast.getCreatedAt());
+        values.put(DatabaseHelper.COL_PODCAST_REVERSE_ORDER, podcast.isReverseOrder() ? 1 : 0);
 
         // Nullable fields
         if (podcast.getDescription() != null) {
@@ -623,6 +653,10 @@ public class PodcastRepository {
         if (!cursor.isNull(lastRefreshIndex)) {
             podcast.setLastRefreshAt(cursor.getLong(lastRefreshIndex));
         }
+
+        // Set reverse order flag
+        int reverseOrderIndex = cursor.getColumnIndexOrThrow(DatabaseHelper.COL_PODCAST_REVERSE_ORDER);
+        podcast.setReverseOrder(cursor.getInt(reverseOrderIndex) == 1);
 
         return podcast;
     }
