@@ -189,13 +189,26 @@ public class RssParser {
     private String readText(XmlPullParser parser, String tagName)
             throws IOException, XmlPullParserException {
         parser.require(XmlPullParser.START_TAG, ns, tagName);
-        String result = "";
-        if (parser.next() == XmlPullParser.TEXT) {
-            result = parser.getText();
-            parser.nextTag();
+        StringBuilder result = new StringBuilder();
+        int eventType = parser.next();
+
+        // Read all content until we hit the closing tag for this element
+        // This handles mixed content (text + HTML tags) in RSS feeds
+        while (eventType != XmlPullParser.END_TAG || !parser.getName().equals(tagName)) {
+            if (eventType == XmlPullParser.TEXT) {
+                result.append(parser.getText());
+                eventType = parser.next();
+            } else if (eventType == XmlPullParser.START_TAG) {
+                // Skip nested HTML tags (e.g., <p>, <br>, etc.)
+                skip(parser);
+                eventType = parser.getEventType();
+            } else {
+                eventType = parser.next();
+            }
         }
+
         parser.require(XmlPullParser.END_TAG, ns, tagName);
-        return result;
+        return result.toString().trim();
     }
 
     private void skip(XmlPullParser parser) throws XmlPullParserException, IOException {

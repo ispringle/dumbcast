@@ -9,7 +9,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 public class DatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "dumbcast.db";
-    private static final int DATABASE_VERSION = 1;
+    private static final int DATABASE_VERSION = 2;
 
     // Table names
     public static final String TABLE_PODCASTS = "podcasts";
@@ -65,7 +65,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         COL_EPISODE_GUID + " TEXT NOT NULL, " +
         COL_EPISODE_TITLE + " TEXT NOT NULL, " +
         COL_EPISODE_DESCRIPTION + " TEXT, " +
-        COL_EPISODE_ENCLOSURE_URL + " TEXT NOT NULL, " +
+        COL_EPISODE_ENCLOSURE_URL + " TEXT, " +
         COL_EPISODE_ENCLOSURE_TYPE + " TEXT, " +
         COL_EPISODE_ENCLOSURE_LENGTH + " INTEGER, " +
         COL_EPISODE_PUBLISHED_AT + " INTEGER NOT NULL, " +
@@ -119,9 +119,48 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        // TODO: Implement proper migration logic before v2. This destroys all user data!
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_EPISODES);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_PODCASTS);
-        onCreate(db);
+        if (oldVersion < 2) {
+            // Migration from version 1 to 2: Make enclosure_url nullable
+            // Create new episodes table with nullable enclosure_url
+            db.execSQL("CREATE TABLE episodes_new (" +
+                COL_EPISODE_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COL_EPISODE_PODCAST_ID + " INTEGER NOT NULL, " +
+                COL_EPISODE_GUID + " TEXT NOT NULL, " +
+                COL_EPISODE_TITLE + " TEXT NOT NULL, " +
+                COL_EPISODE_DESCRIPTION + " TEXT, " +
+                COL_EPISODE_ENCLOSURE_URL + " TEXT, " +
+                COL_EPISODE_ENCLOSURE_TYPE + " TEXT, " +
+                COL_EPISODE_ENCLOSURE_LENGTH + " INTEGER, " +
+                COL_EPISODE_PUBLISHED_AT + " INTEGER NOT NULL, " +
+                COL_EPISODE_FETCHED_AT + " INTEGER NOT NULL, " +
+                COL_EPISODE_DURATION + " INTEGER, " +
+                COL_EPISODE_STATE + " TEXT NOT NULL DEFAULT 'NEW', " +
+                COL_EPISODE_VIEWED_AT + " INTEGER, " +
+                COL_EPISODE_SAVED_AT + " INTEGER, " +
+                COL_EPISODE_PLAYED_AT + " INTEGER, " +
+                COL_EPISODE_PLAYBACK_POS + " INTEGER DEFAULT 0, " +
+                COL_EPISODE_DOWNLOAD_PATH + " TEXT, " +
+                COL_EPISODE_DOWNLOADED_AT + " INTEGER, " +
+                COL_EPISODE_SESSION_GRACE + " INTEGER DEFAULT 0, " +
+                COL_EPISODE_CHAPTERS_URL + " TEXT, " +
+                "FOREIGN KEY(" + COL_EPISODE_PODCAST_ID + ") REFERENCES " +
+                TABLE_PODCASTS + "(" + COL_PODCAST_ID + ") ON DELETE CASCADE, " +
+                "UNIQUE(" + COL_EPISODE_PODCAST_ID + ", " + COL_EPISODE_GUID + "))");
+
+            // Copy data from old table to new table
+            db.execSQL("INSERT INTO episodes_new SELECT * FROM " + TABLE_EPISODES);
+
+            // Drop old table
+            db.execSQL("DROP TABLE " + TABLE_EPISODES);
+
+            // Rename new table to original name
+            db.execSQL("ALTER TABLE episodes_new RENAME TO " + TABLE_EPISODES);
+
+            // Recreate indexes
+            db.execSQL(CREATE_EPISODE_STATE_INDEX);
+            db.execSQL(CREATE_EPISODE_PODCAST_STATE_INDEX);
+            db.execSQL(CREATE_EPISODE_FETCHED_INDEX);
+            db.execSQL(CREATE_EPISODE_PUBLISHED_INDEX);
+        }
     }
 }

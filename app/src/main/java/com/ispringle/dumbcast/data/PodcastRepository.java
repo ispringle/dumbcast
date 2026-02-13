@@ -340,31 +340,51 @@ public class PodcastRepository {
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         long now = System.currentTimeMillis();
         int newEpisodeCount = 0;
+        int skippedCount = 0;
+
+        Log.d(TAG, "Processing " + feed.getItems().size() + " items from feed for podcast ID: " + podcastId);
 
         db.beginTransaction();
         try {
             for (RssFeed.RssItem item : feed.getItems()) {
-                // Skip items without required fields
-                if (item.getGuid() == null || item.getTitle() == null ||
-                    item.getEnclosureUrl() == null) {
-                    Log.w(TAG, "Skipping item with missing required fields - " +
-                          "guid: " + (item.getGuid() != null ? "present" : "MISSING") +
-                          ", title: " + (item.getTitle() != null ? "present" : "MISSING") +
-                          ", enclosureUrl: " + (item.getEnclosureUrl() != null ? "present" : "MISSING"));
+                // Only require title - GUID and enclosureUrl are now optional
+                if (item.getTitle() == null || item.getTitle().trim().isEmpty()) {
+                    Log.w(TAG, "Skipping item without title");
+                    skippedCount++;
                     continue;
+                }
+
+                // Generate GUID if missing
+                String guid = item.getGuid();
+                if (guid == null || guid.trim().isEmpty()) {
+                    if (item.getEnclosureUrl() != null && !item.getEnclosureUrl().trim().isEmpty()) {
+                        // Use enclosure URL as GUID
+                        guid = "url:" + item.getEnclosureUrl();
+                        Log.d(TAG, "Generated GUID from enclosure URL for: " + item.getTitle());
+                    } else if (item.getPublishedAt() > 0) {
+                        // Use title + publishedAt as GUID
+                        guid = "title-date:" + item.getTitle() + ":" + item.getPublishedAt();
+                        Log.d(TAG, "Generated GUID from title+date for: " + item.getTitle());
+                    } else {
+                        // Last resort: just use title
+                        guid = "title:" + item.getTitle();
+                        Log.d(TAG, "Generated GUID from title for: " + item.getTitle());
+                    }
                 }
 
                 // Check if episode already exists
-                if (episodeExists(podcastId, item.getGuid())) {
+                if (episodeExists(podcastId, guid)) {
+                    Log.d(TAG, "Episode already exists, skipping: " + item.getTitle());
+                    skippedCount++;
                     continue;
                 }
 
-                // Create new episode
+                // Create new episode with potentially generated GUID
                 Episode episode = new Episode(
                     podcastId,
-                    item.getGuid(),
+                    guid,
                     item.getTitle(),
-                    item.getEnclosureUrl(),
+                    item.getEnclosureUrl(),  // Can be null now
                     item.getPublishedAt()
                 );
 
@@ -386,11 +406,16 @@ public class PodcastRepository {
                 long episodeId = episodeRepository.insertEpisode(episode);
                 if (episodeId != -1) {
                     newEpisodeCount++;
+                    Log.d(TAG, "Inserted episode: " + episode.getTitle() + " (GUID: " + guid + ")");
+                } else {
+                    Log.w(TAG, "Failed to insert episode: " + episode.getTitle());
+                    skippedCount++;
                 }
             }
 
             db.setTransactionSuccessful();
-            Log.d(TAG, "Inserted " + newEpisodeCount + " new episodes for podcast ID: " + podcastId);
+            Log.d(TAG, "Inserted " + newEpisodeCount + " new episodes for podcast " + podcastId +
+                  " (skipped " + skippedCount + " existing/invalid items)");
         } finally {
             db.endTransaction();
         }
