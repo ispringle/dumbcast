@@ -54,22 +54,36 @@ public class DownloadService extends Service {
     public void onCreate() {
         super.onCreate();
 
-        downloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-        DatabaseHelper dbHelper = DatabaseManager.getInstance(this);
-        episodeRepository = new EpisodeRepository(dbHelper);
-        podcastRepository = new PodcastRepository(dbHelper);
-        prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        downloadEpisodeMap = new HashMap<>();
+        try {
+            downloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+            DatabaseHelper dbHelper = DatabaseManager.getInstance(this);
+            episodeRepository = new EpisodeRepository(dbHelper);
+            podcastRepository = new PodcastRepository(dbHelper);
+            prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+            downloadEpisodeMap = new HashMap<>();
 
-        // Register broadcast receiver for download completion
-        downloadCompleteReceiver = new DownloadCompleteReceiver();
-        IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
-        registerReceiver(downloadCompleteReceiver, filter);
+            // Register broadcast receiver for download completion
+            downloadCompleteReceiver = new DownloadCompleteReceiver();
+            IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+            registerReceiver(downloadCompleteReceiver, filter);
 
-        // Create notification channel for download notifications
-        createNotificationChannel();
+            // Create notification channel for download notifications
+            createNotificationChannel();
 
-        Log.d(TAG, "DownloadService created");
+            Log.d(TAG, "DownloadService created");
+        } catch (Exception e) {
+            Log.e(TAG, "Error in onCreate, cleaning up", e);
+            // Ensure receiver is unregistered if registration succeeded before exception
+            if (downloadCompleteReceiver != null) {
+                try {
+                    unregisterReceiver(downloadCompleteReceiver);
+                } catch (IllegalArgumentException ignored) {
+                    // Receiver was not registered, ignore
+                }
+                downloadCompleteReceiver = null;
+            }
+            throw e; // Re-throw to signal service creation failure
+        }
     }
 
     @Override
@@ -113,9 +127,15 @@ public class DownloadService extends Service {
     public void onDestroy() {
         super.onDestroy();
 
-        // Unregister broadcast receiver
+        // Unregister broadcast receiver safely
         if (downloadCompleteReceiver != null) {
-            unregisterReceiver(downloadCompleteReceiver);
+            try {
+                unregisterReceiver(downloadCompleteReceiver);
+                downloadCompleteReceiver = null;
+            } catch (IllegalArgumentException e) {
+                // Receiver was not registered or already unregistered
+                Log.w(TAG, "Receiver already unregistered", e);
+            }
         }
 
         Log.d(TAG, "DownloadService destroyed");
