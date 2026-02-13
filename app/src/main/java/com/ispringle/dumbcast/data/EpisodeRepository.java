@@ -335,6 +335,37 @@ public class EpisodeRepository {
     }
 
     /**
+     * Check if an episode with the given GUID already exists for a podcast.
+     * @param podcastId The podcast ID
+     * @param guid The episode GUID
+     * @return true if the episode exists, false otherwise
+     */
+    public boolean episodeExists(long podcastId, String guid) {
+        if (guid == null || guid.isEmpty()) {
+            return false;
+        }
+
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        Cursor cursor = db.query(
+            DatabaseHelper.TABLE_EPISODES,
+            new String[]{DatabaseHelper.COL_EPISODE_ID},
+            DatabaseHelper.COL_EPISODE_PODCAST_ID + " = ? AND " + DatabaseHelper.COL_EPISODE_GUID + " = ?",
+            new String[]{String.valueOf(podcastId), guid},
+            null,
+            null,
+            null
+        );
+
+        boolean exists = false;
+        if (cursor != null) {
+            exists = cursor.getCount() > 0;
+            cursor.close();
+        }
+
+        return exists;
+    }
+
+    /**
      * Convert an Episode object to ContentValues for database insertion/update.
      * @param episode The episode to convert
      * @return ContentValues containing episode data

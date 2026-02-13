@@ -27,6 +27,8 @@ import com.ispringle.dumbcast.data.EpisodeRepository;
 import com.ispringle.dumbcast.data.EpisodeState;
 import com.ispringle.dumbcast.data.Podcast;
 import com.ispringle.dumbcast.data.PodcastRepository;
+import com.ispringle.dumbcast.utils.RssFeed;
+import com.ispringle.dumbcast.utils.RssFeedUtils;
 
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -259,11 +261,20 @@ public class SubscriptionsFragment extends Fragment {
     }
 
     /**
-     * Refresh a single podcast (stub implementation).
+     * Refresh a single podcast by fetching its RSS feed and adding new episodes.
      * @param podcast The podcast to refresh
      */
     private void refreshPodcast(Podcast podcast) {
-        Toast.makeText(getContext(), getString(R.string.toast_refresh, podcast.getTitle()), Toast.LENGTH_SHORT).show();
+        if (getContext() == null) {
+            return;
+        }
+
+        // Show refreshing toast
+        String message = getString(R.string.toast_refreshing_podcast, podcast.getTitle());
+        Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+
+        // Start async task to fetch and parse RSS
+        new RefreshPodcastTask(this, podcast, episodeRepository).execute();
     }
 
     /**
@@ -369,6 +380,137 @@ public class SubscriptionsFragment extends Fragment {
                 } else {
                     Toast.makeText(fragment.getContext(), R.string.toast_no_new_episodes, Toast.LENGTH_SHORT).show();
                 }
+            }
+        }
+    }
+
+    /**
+     * Result class for podcast refresh operation.
+     */
+    private static class RefreshResult {
+        enum Status { SUCCESS, NETWORK_ERROR, PARSE_ERROR, UNKNOWN_ERROR }
+
+        Status status;
+        int newEpisodeCount;
+        String errorMessage;
+
+        RefreshResult(Status status, int newEpisodeCount) {
+            this.status = status;
+            this.newEpisodeCount = newEpisodeCount;
+            this.errorMessage = null;
+        }
+
+        RefreshResult(Status status, String errorMessage) {
+            this.status = status;
+            this.newEpisodeCount = 0;
+            this.errorMessage = errorMessage;
+        }
+    }
+
+    /**
+     * AsyncTask to refresh a podcast by fetching its RSS feed and adding new episodes.
+     */
+    private static class RefreshPodcastTask extends AsyncTask<Void, Void, RefreshResult> {
+        private final WeakReference<SubscriptionsFragment> fragmentRef;
+        private final Podcast podcast;
+        private final EpisodeRepository episodeRepository;
+
+        RefreshPodcastTask(SubscriptionsFragment fragment, Podcast podcast, EpisodeRepository episodeRepository) {
+            this.fragmentRef = new WeakReference<>(fragment);
+            this.podcast = podcast;
+            this.episodeRepository = episodeRepository;
+        }
+
+        @Override
+        protected RefreshResult doInBackground(Void... voids) {
+            try {
+                // Fetch RSS feed
+                RssFeed feed = RssFeedUtils.fetchFeed(podcast.getFeedUrl());
+
+                // Process each episode from the feed
+                int newEpisodeCount = 0;
+                long now = System.currentTimeMillis();
+
+                for (RssFeed.RssItem item : feed.getItems()) {
+                    // Skip if no GUID (required for duplicate detection)
+                    if (item.getGuid() == null || item.getGuid().isEmpty()) {
+                        Log.w(TAG, "Skipping episode without GUID: " + item.getTitle());
+                        continue;
+                    }
+
+                    // Check if episode already exists
+                    if (episodeRepository.episodeExists(podcast.getId(), item.getGuid())) {
+                        continue;
+                    }
+
+                    // Create new episode
+                    Episode episode = new Episode(
+                        podcast.getId(),
+                        item.getGuid(),
+                        item.getTitle(),
+                        item.getEnclosureUrl(),
+                        item.getPublishedAt()
+                    );
+
+                    // Set optional fields
+                    episode.setDescription(item.getDescription());
+                    episode.setEnclosureType(item.getEnclosureType());
+                    episode.setEnclosureLength(item.getEnclosureLength());
+                    episode.setDuration(item.getDuration());
+                    episode.setChaptersUrl(item.getChaptersUrl());
+                    episode.setFetchedAt(now);
+                    episode.setState(EpisodeState.NEW);
+
+                    // Insert into database
+                    long result = episodeRepository.insertEpisode(episode);
+                    if (result != -1) {
+                        newEpisodeCount++;
+                    }
+                }
+
+                return new RefreshResult(RefreshResult.Status.SUCCESS, newEpisodeCount);
+
+            } catch (IOException e) {
+                Log.e(TAG, "Network error while refreshing podcast: " + podcast.getTitle(), e);
+                return new RefreshResult(RefreshResult.Status.NETWORK_ERROR, e.getMessage());
+            } catch (XmlPullParserException e) {
+                Log.e(TAG, "Parse error while refreshing podcast: " + podcast.getTitle(), e);
+                return new RefreshResult(RefreshResult.Status.PARSE_ERROR, e.getMessage());
+            } catch (Exception e) {
+                Log.e(TAG, "Unknown error while refreshing podcast: " + podcast.getTitle(), e);
+                return new RefreshResult(RefreshResult.Status.UNKNOWN_ERROR, e.getMessage());
+            }
+        }
+
+        @Override
+        protected void onPostExecute(RefreshResult result) {
+            SubscriptionsFragment fragment = fragmentRef.get();
+            if (fragment == null || fragment.getContext() == null) {
+                return;
+            }
+
+            // Show result toast
+            switch (result.status) {
+                case SUCCESS:
+                    if (result.newEpisodeCount > 0) {
+                        String message = fragment.getString(R.string.toast_refresh_success, result.newEpisodeCount);
+                        Toast.makeText(fragment.getContext(), message, Toast.LENGTH_SHORT).show();
+                        // Refresh the podcast list to update episode counts
+                        fragment.loadPodcasts();
+                    } else {
+                        Toast.makeText(fragment.getContext(), R.string.toast_refresh_no_new, Toast.LENGTH_SHORT).show();
+                    }
+                    break;
+                case NETWORK_ERROR:
+                    Toast.makeText(fragment.getContext(), R.string.toast_refresh_network_error, Toast.LENGTH_LONG).show();
+                    break;
+                case PARSE_ERROR:
+                    Toast.makeText(fragment.getContext(), R.string.toast_refresh_parse_error, Toast.LENGTH_LONG).show();
+                    break;
+                case UNKNOWN_ERROR:
+                    String errorMessage = fragment.getString(R.string.toast_refresh_error, result.errorMessage);
+                    Toast.makeText(fragment.getContext(), errorMessage, Toast.LENGTH_LONG).show();
+                    break;
             }
         }
     }
