@@ -7,8 +7,11 @@ import android.database.sqlite.SQLiteDatabase;
 import java.util.ArrayList;
 import java.util.List;
 
+import android.util.Log;
+
 public class EpisodeRepository {
 
+    private static final String TAG = "EpisodeRepository";
     private final DatabaseHelper dbHelper;
     private static final long SEVEN_DAYS_MS = 7L * 24 * 60 * 60 * 1000;
 
@@ -84,6 +87,35 @@ public class EpisodeRepository {
         try {
             db.update(DatabaseHelper.TABLE_EPISODES, values, whereClause, whereArgs);
             db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    /**
+     * Fix state for downloaded episodes.
+     * Episodes that are downloaded but still in NEW state should be moved to BACKLOG.
+     * This is a migration fix for episodes downloaded before auto-state-change was implemented.
+     */
+    public void fixDownloadedEpisodesState() {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+
+        ContentValues values = new ContentValues();
+        values.put(DatabaseHelper.COL_EPISODE_STATE, EpisodeState.BACKLOG.name());
+        values.put(DatabaseHelper.COL_EPISODE_SAVED_AT, System.currentTimeMillis());
+
+        // Update episodes that are downloaded but not in BACKLOG or LISTENED state
+        String whereClause = DatabaseHelper.COL_EPISODE_DOWNLOAD_PATH + " IS NOT NULL AND " +
+            DatabaseHelper.COL_EPISODE_STATE + " != ? AND " +
+            DatabaseHelper.COL_EPISODE_STATE + " != ?";
+
+        String[] whereArgs = {EpisodeState.BACKLOG.name(), EpisodeState.LISTENED.name()};
+
+        db.beginTransaction();
+        try {
+            int updated = db.update(DatabaseHelper.TABLE_EPISODES, values, whereClause, whereArgs);
+            db.setTransactionSuccessful();
+            Log.d(TAG, "Fixed state for " + updated + " downloaded episodes");
         } finally {
             db.endTransaction();
         }
@@ -215,6 +247,62 @@ public class EpisodeRepository {
         }
 
         return episodes;
+    }
+
+    /**
+     * Get episodes for a specific podcast AND state.
+     * @param podcastId The podcast ID to filter by
+     * @param state The episode state to filter by
+     * @return List of episodes matching both filters, ordered by published date (newest first)
+     */
+    public List<Episode> getEpisodesByPodcastAndState(long podcastId, EpisodeState state) {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        List<Episode> episodes = new ArrayList<>();
+
+        Cursor cursor = db.query(
+            DatabaseHelper.TABLE_EPISODES,
+            null,
+            DatabaseHelper.COL_EPISODE_PODCAST_ID + " = ? AND " + DatabaseHelper.COL_EPISODE_STATE + " = ?",
+            new String[]{String.valueOf(podcastId), state.name()},
+            null,
+            null,
+            DatabaseHelper.COL_EPISODE_PUBLISHED_AT + " DESC"
+        );
+
+        if (cursor != null) {
+            while (cursor.moveToNext()) {
+                episodes.add(cursorToEpisode(cursor));
+            }
+            cursor.close();
+        }
+
+        return episodes;
+    }
+
+    /**
+     * Get the count of episodes for a specific podcast AND state.
+     * @param podcastId The podcast ID
+     * @param state The episode state to filter by
+     * @return The number of episodes matching both filters
+     */
+    public int getEpisodeCountByPodcastAndState(long podcastId, EpisodeState state) {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        Cursor cursor = db.rawQuery(
+            "SELECT COUNT(*) FROM " + DatabaseHelper.TABLE_EPISODES +
+            " WHERE " + DatabaseHelper.COL_EPISODE_PODCAST_ID + " = ? AND " +
+            DatabaseHelper.COL_EPISODE_STATE + " = ?",
+            new String[]{String.valueOf(podcastId), state.name()}
+        );
+
+        int count = 0;
+        if (cursor != null) {
+            if (cursor.moveToFirst()) {
+                count = cursor.getInt(0);
+            }
+            cursor.close();
+        }
+
+        return count;
     }
 
     /**

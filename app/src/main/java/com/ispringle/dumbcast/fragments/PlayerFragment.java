@@ -62,6 +62,8 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
     private TextView podcastNameText;
     private TextView chapterNameText;
     private TextView progressText;
+    private TextView elapsedTimeText;
+    private TextView totalTimeText;
     private TextView playPauseButton;
     private TextView statusMessage;
     private ProgressBar progressBar;
@@ -108,6 +110,10 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
         playPauseButton = view.findViewById(R.id.player_play_pause);
         statusMessage = view.findViewById(R.id.player_status_message);
         progressBar = view.findViewById(R.id.player_progress_bar);
+
+        // Initialize new separate time displays
+        elapsedTimeText = view.findViewById(R.id.player_elapsed_time);
+        totalTimeText = view.findViewById(R.id.player_total_time);
 
         // Enable marquee effect for episode title
         episodeTitleText.setSelected(true);
@@ -316,7 +322,8 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
         episodeTitleText.setText(R.string.no_episode_loaded);
         podcastNameText.setVisibility(View.GONE);
         chapterNameText.setVisibility(View.GONE);
-        progressText.setText(R.string.time_default);
+        elapsedTimeText.setText("0:00");
+        totalTimeText.setText("0:00");
         progressBar.setProgress(0);
         playPauseButton.setText(R.string.button_play);
         statusMessage.setText(R.string.load_episode_message);
@@ -327,10 +334,9 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
      * Update progress bar and text
      */
     private void updateProgress(int positionSeconds, int durationSeconds) {
-        // Update progress text
-        String positionStr = formatTime(positionSeconds);
-        String durationStr = formatTime(durationSeconds);
-        progressText.setText(positionStr + " / " + durationStr);
+        // Update separate time displays
+        elapsedTimeText.setText(formatTime(positionSeconds));
+        totalTimeText.setText(formatTime(durationSeconds));
 
         // Update progress bar
         if (durationSeconds > 0) {

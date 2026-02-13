@@ -93,6 +93,7 @@
     <string name="player_no_show_notes">No show notes available</string>
 
     <!-- Player UI -->
+    <string name="now_playing_header">Now Playing</string>
     <string name="no_episode_loaded">No episode loaded</string>
     <string name="button_pause">⏸ Pause</string>
     <string name="button_play">▶ Play</string>

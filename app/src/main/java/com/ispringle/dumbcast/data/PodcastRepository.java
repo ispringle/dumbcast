@@ -247,6 +247,18 @@ public class PodcastRepository {
      * @throws XmlPullParserException If XML parsing error occurs
      */
     private RssFeed fetchFeed(String feedUrl) throws IOException, XmlPullParserException {
+        return fetchFeedWithRedirects(feedUrl, 5); // Allow up to 5 redirects
+    }
+
+    /**
+     * Fetch RSS feed with manual redirect following.
+     * HttpURLConnection doesn't follow HTTP -> HTTPS redirects by default.
+     */
+    private RssFeed fetchFeedWithRedirects(String feedUrl, int maxRedirects) throws IOException, XmlPullParserException {
+        if (maxRedirects <= 0) {
+            throw new IOException("Too many redirects");
+        }
+
         URL url = new URL(feedUrl);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
 
@@ -255,8 +267,22 @@ public class PodcastRepository {
             connection.setConnectTimeout(15000);
             connection.setReadTimeout(15000);
             connection.setRequestProperty("User-Agent", "Dumbcast/1.0");
+            connection.setInstanceFollowRedirects(false); // Handle redirects manually
 
             int responseCode = connection.getResponseCode();
+
+            // Handle redirects (301, 302, 303, 307, 308)
+            if (responseCode >= 300 && responseCode < 400) {
+                String newUrl = connection.getHeaderField("Location");
+                if (newUrl == null) {
+                    throw new IOException("Redirect with no Location header");
+                }
+
+                Log.d(TAG, "Following redirect: " + feedUrl + " -> " + newUrl);
+                connection.disconnect();
+                return fetchFeedWithRedirects(newUrl, maxRedirects - 1);
+            }
+
             if (responseCode != HttpURLConnection.HTTP_OK) {
                 throw new IOException("HTTP error code: " + responseCode);
             }
@@ -321,7 +347,10 @@ public class PodcastRepository {
                 // Skip items without required fields
                 if (item.getGuid() == null || item.getTitle() == null ||
                     item.getEnclosureUrl() == null) {
-                    Log.w(TAG, "Skipping item with missing required fields");
+                    Log.w(TAG, "Skipping item with missing required fields - " +
+                          "guid: " + (item.getGuid() != null ? "present" : "MISSING") +
+                          ", title: " + (item.getTitle() != null ? "present" : "MISSING") +
+                          ", enclosureUrl: " + (item.getEnclosureUrl() != null ? "present" : "MISSING"));
                     continue;
                 }
 

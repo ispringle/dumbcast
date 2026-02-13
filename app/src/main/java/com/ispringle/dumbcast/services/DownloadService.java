@@ -23,10 +23,14 @@ import com.ispringle.dumbcast.data.DatabaseHelper;
 import com.ispringle.dumbcast.data.DatabaseManager;
 import com.ispringle.dumbcast.data.Episode;
 import com.ispringle.dumbcast.data.EpisodeRepository;
+import com.ispringle.dumbcast.data.EpisodeState;
 import com.ispringle.dumbcast.data.Podcast;
 import com.ispringle.dumbcast.data.PodcastRepository;
 
 import java.io.File;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -92,19 +96,25 @@ public class DownloadService extends Service {
             String action = intent.getAction();
 
             if ("ACTION_DOWNLOAD_EPISODE".equals(action)) {
-                long episodeId = intent.getLongExtra("episode_id", -1);
+                final long episodeId = intent.getLongExtra("episode_id", -1);
                 if (episodeId != -1) {
-                    Episode episode = episodeRepository.getEpisodeById(episodeId);
-                    if (episode != null) {
-                        Podcast podcast = podcastRepository.getPodcastById(episode.getPodcastId());
-                        if (podcast != null) {
-                            downloadEpisode(episode, podcast.getTitle());
-                        } else {
-                            Log.e(TAG, "Podcast not found for episode ID: " + episodeId);
+                    // Run download on background thread to avoid NetworkOnMainThreadException
+                    new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            Episode episode = episodeRepository.getEpisodeById(episodeId);
+                            if (episode != null) {
+                                Podcast podcast = podcastRepository.getPodcastById(episode.getPodcastId());
+                                if (podcast != null) {
+                                    downloadEpisode(episode, podcast.getTitle());
+                                } else {
+                                    Log.e(TAG, "Podcast not found for episode ID: " + episodeId);
+                                }
+                            } else {
+                                Log.e(TAG, "Episode not found with ID: " + episodeId);
+                            }
                         }
-                    } else {
-                        Log.e(TAG, "Episode not found with ID: " + episodeId);
-                    }
+                    }).start();
                 }
             } else if ("ACTION_CANCEL_DOWNLOAD".equals(action)) {
                 long episodeId = intent.getLongExtra("episode_id", -1);
@@ -161,8 +171,15 @@ public class DownloadService extends Service {
         }
 
         try {
+            // Resolve redirects manually because:
+            // 1. DownloadManager doesn't handle HTTP->HTTPS redirects
+            // 2. DownloadManager has a low redirect limit (~5) but podcast analytics chains can be longer
+            Log.d(TAG, "Resolving URL: " + enclosureUrl);
+            String finalUrl = resolveRedirects(enclosureUrl, 15); // Allow up to 15 redirects
+            Log.d(TAG, "Final URL: " + finalUrl);
+
             // Extract file extension from URL
-            String fileExtension = getFileExtension(enclosureUrl);
+            String fileExtension = getFileExtension(finalUrl);
 
             // Sanitize names for file system
             String sanitizedPodcastName = sanitizeFileName(podcastName);
@@ -185,7 +202,7 @@ public class DownloadService extends Service {
             File destinationFile = new File(podcastDir, fileName);
 
             // Configure download request
-            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(enclosureUrl))
+            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(finalUrl))
                 .setTitle(episode.getTitle())
                 .setDescription("Downloading from " + podcastName)
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
@@ -273,11 +290,14 @@ public class DownloadService extends Service {
                     // Convert URI to file path
                     String filePath = Uri.parse(localUri).getPath();
 
-                    // Update database
+                    // Update database - mark as downloaded
                     long downloadedAt = System.currentTimeMillis();
                     int updated = episodeRepository.updateEpisodeDownload(episodeId, filePath, downloadedAt);
 
                     if (updated > 0) {
+                        // Move episode to BACKLOG state (downloaded episodes go to backlog)
+                        episodeRepository.updateEpisodeState(episodeId, EpisodeState.BACKLOG);
+
                         Episode episode = episodeRepository.getEpisodeById(episodeId);
                         if (episode != null) {
                             showSuccessNotification(episode.getTitle());
@@ -337,6 +357,53 @@ public class DownloadService extends Service {
         }
 
         return "mp3";
+    }
+
+    /**
+     * Resolve redirects for a URL and return the final URL.
+     * DownloadManager doesn't handle HTTP->HTTPS redirects well, so we pre-resolve them.
+     *
+     * @param url The URL to resolve
+     * @param maxRedirects Maximum number of redirects to follow
+     * @return The final URL after following redirects
+     * @throws IOException If network error occurs or too many redirects
+     */
+    private String resolveRedirects(String url, int maxRedirects) throws IOException {
+        if (maxRedirects <= 0) {
+            throw new IOException("Too many redirects");
+        }
+
+        HttpURLConnection connection = null;
+        try {
+            URL urlObj = new URL(url);
+            connection = (HttpURLConnection) urlObj.openConnection();
+            connection.setRequestMethod("HEAD");  // Use HEAD to avoid downloading content
+            connection.setInstanceFollowRedirects(false);  // Handle redirects manually
+            connection.setConnectTimeout(10000);
+            connection.setReadTimeout(10000);
+            connection.setRequestProperty("User-Agent", "Dumbcast/1.0");
+
+            int responseCode = connection.getResponseCode();
+
+            // Handle redirects (301, 302, 303, 307, 308)
+            if (responseCode >= 300 && responseCode < 400) {
+                String newUrl = connection.getHeaderField("Location");
+                if (newUrl == null) {
+                    throw new IOException("Redirect with no Location header");
+                }
+
+                Log.d(TAG, "Following redirect: " + url + " -> " + newUrl);
+                return resolveRedirects(newUrl, maxRedirects - 1);
+            }
+
+            // Not a redirect, return the URL as-is
+            return url;
+
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
     }
 
     /**
