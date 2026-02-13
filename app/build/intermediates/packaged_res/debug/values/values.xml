@@ -86,6 +86,12 @@
     <string name="toast_no_new_episodes">No NEW episodes found</string>
     <string name="toast_refresh">Refresh: %s</string>
     <string name="toast_refresh_all">Refresh All Podcasts</string>
+    <string name="toast_refresh_error">Refresh failed: %s</string>
+    <string name="toast_refresh_network_error">Network error. Check connection.</string>
+    <string name="toast_refresh_no_new">No new episodes found</string>
+    <string name="toast_refresh_parse_error">Failed to parse podcast feed</string>
+    <string name="toast_refresh_success">Added %d new episodes</string>
+    <string name="toast_refreshing_podcast">Refreshing %s...</string>
     <string name="toast_remove_new">Remove NEW from: %s</string>
     <string name="toast_saved_to_backlog">Saved to backlog</string>
     <string name="toast_subscribe_to_interact">Subscribe to podcast to %s</string>

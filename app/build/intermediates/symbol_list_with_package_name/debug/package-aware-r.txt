@@ -713,6 +713,7 @@ drawable design_ic_visibility
 drawable design_ic_visibility_off
 drawable design_password_eye
 drawable design_snackbar_background
+drawable ic_podcast_brain
 drawable navigation_empty_icon
 drawable notification_action_background
 drawable notification_bg
@@ -1138,6 +1139,12 @@ string toast_marked_viewed
 string toast_no_new_episodes
 string toast_refresh
 string toast_refresh_all
+string toast_refresh_error
+string toast_refresh_network_error
+string toast_refresh_no_new
+string toast_refresh_parse_error
+string toast_refresh_success
+string toast_refreshing_podcast
 string toast_remove_new
 string toast_saved_to_backlog
 string toast_subscribe_to_interact

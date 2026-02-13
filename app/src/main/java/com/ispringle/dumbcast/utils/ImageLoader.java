@@ -143,11 +143,12 @@ public class ImageLoader {
     }
 
     /**
-     * Set placeholder background on ImageView.
+     * Set placeholder image on ImageView.
+     * Uses the podcast-brain icon as a fallback when no artwork is available.
      */
     private void setPlaceholder(Context context, ImageView imageView) {
-        imageView.setImageDrawable(null);
-        imageView.setBackgroundColor(ContextCompat.getColor(context, R.color.artwork_placeholder));
+        imageView.setBackgroundColor(0); // Clear any background color
+        imageView.setImageResource(com.ispringle.dumbcast.R.drawable.ic_podcast_brain);
     }
 
     /**

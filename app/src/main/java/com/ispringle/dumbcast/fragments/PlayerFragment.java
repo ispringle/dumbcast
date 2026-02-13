@@ -293,8 +293,8 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
             podcastNameText.setVisibility(View.GONE);
 
             // No podcast found, show placeholder
-            artworkImage.setImageDrawable(null);
-            artworkImage.setBackgroundColor(ContextCompat.getColor(getContext(), R.color.artwork_placeholder));
+            artworkImage.setBackgroundColor(0);
+            artworkImage.setImageResource(R.drawable.ic_podcast_brain);
         }
 
         // Update play/pause button
@@ -317,8 +317,8 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
      * Show "no episode loaded" state
      */
     private void showNoEpisodeState() {
-        artworkImage.setImageDrawable(null);
-        artworkImage.setBackgroundColor(ContextCompat.getColor(getContext(), R.color.artwork_placeholder));
+        artworkImage.setBackgroundColor(0);
+        artworkImage.setImageResource(R.drawable.ic_podcast_brain);
         episodeTitleText.setText(R.string.no_episode_loaded);
         podcastNameText.setVisibility(View.GONE);
         chapterNameText.setVisibility(View.GONE);

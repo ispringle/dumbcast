@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <linearGradient id="headGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2d3748;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a202c;stop-opacity:1" />
+    </linearGradient>
+    <radialGradient id="glowGradient" cx="50%" cy="50%">
+      <stop offset="0%" style="stop-color:#f97316;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#f97316;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+  
+  <!-- Glow effect behind RSS symbol -->
+  <circle cx="200" cy="120" r="80" fill="url(#glowGradient)" opacity="0.6"/>
+  
+  <!-- Head outline (bottom portion) -->
+  <path d="M 120 220 Q 120 310 140 360 L 260 360 Q 280 310 280 220" 
+        fill="url(#headGradient)" stroke="#4a5568" stroke-width="2"/>
+  
+  <!-- Neck -->
+  <rect x="170" y="360" width="60" height="40" fill="#2d3748" stroke="#4a5568" stroke-width="2"/>
+  
+  <!-- Head outline (sides - opened top) -->
+  <path d="M 120 220 Q 100 180 110 140 L 140 115" 
+        fill="none" stroke="#4a5568" stroke-width="3" stroke-linecap="round"/>
+  <path d="M 280 220 Q 300 180 290 140 L 260 115" 
+        fill="none" stroke="#4a5568" stroke-width="3" stroke-linecap="round"/>
+  
+  <!-- Face features -->
+  <!-- Eyes -->
+  <circle cx="165" cy="250" r="8" fill="#1a202c"/>
+  <circle cx="235" cy="250" r="8" fill="#1a202c"/>
+  <circle cx="167" cy="248" r="3" fill="#fff"/>
+  <circle cx="237" cy="248" r="3" fill="#fff"/>
+  
+  <!-- Nose -->
+  <path d="M 200 260 L 195 280 L 205 280 Z" fill="#1a202c" opacity="0.3"/>
+  
+  <!-- Mouth -->
+  <path d="M 180 300 Q 200 310 220 300" fill="none" stroke="#1a202c" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- RSS/Podcast Symbol -->
+  <!-- Main dot -->
+  <circle cx="200" cy="120" r="12" fill="#f97316"/>
+  
+  <!-- Inner arc -->
+  <path d="M 200 120 Q 200 100 220 100 Q 240 100 240 120 Q 240 140 220 140"
+        fill="none" stroke="#f97316" stroke-width="8" stroke-linecap="round"/>
+  
+  <!-- Middle arc -->
+  <path d="M 200 120 Q 200 80 240 80 Q 280 80 280 120 Q 280 160 240 160"
+        fill="none" stroke="#f97316" stroke-width="8" stroke-linecap="round" opacity="0.8"/>
+  
+  <!-- Outer arc -->
+  <path d="M 200 120 Q 200 60 260 60 Q 320 60 320 120 Q 320 180 260 180"
+        fill="none" stroke="#f97316" stroke-width="8" stroke-linecap="round" opacity="0.6"/>
+  
+  <!-- Energy rays -->
+  <line x1="200" y1="120" x2="200" y2="30" stroke="#f97316" stroke-width="3" opacity="0.5" stroke-linecap="round"/>
+  <line x1="200" y1="120" x2="260" y2="50" stroke="#f97316" stroke-width="2" opacity="0.4" stroke-linecap="round"/>
+  <line x1="200" y1="120" x2="140" y2="50" stroke="#f97316" stroke-width="2" opacity="0.4" stroke-linecap="round"/>
+  <line x1="200" y1="120" x2="300" y2="90" stroke="#f97316" stroke-width="2" opacity="0.3" stroke-linecap="round"/>
+  <line x1="200" y1="120" x2="100" y2="90" stroke="#f97316" stroke-width="2" opacity="0.3" stroke-linecap="round"/>
+</svg>

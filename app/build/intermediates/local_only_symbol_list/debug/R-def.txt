@@ -1,6 +1,7 @@
 R_DEF: Internal format may change without notice
 local
 color artwork_placeholder
+drawable ic_podcast_brain
 id discovery_title
 id episode_download_status
 id episode_duration
@@ -128,6 +129,12 @@ string toast_marked_viewed
 string toast_no_new_episodes
 string toast_refresh
 string toast_refresh_all
+string toast_refresh_error
+string toast_refresh_network_error
+string toast_refresh_no_new
+string toast_refresh_parse_error
+string toast_refresh_success
+string toast_refreshing_podcast
 string toast_remove_new
 string toast_saved_to_backlog
 string toast_subscribe_to_interact
