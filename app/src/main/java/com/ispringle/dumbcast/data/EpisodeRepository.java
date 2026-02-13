@@ -119,6 +119,27 @@ public class EpisodeRepository {
     }
 
     /**
+     * Update the download information for an episode.
+     * @param id The episode ID
+     * @param downloadPath The local file path to the downloaded episode
+     * @param downloadedAt The timestamp when the download completed
+     * @return The number of rows affected
+     */
+    public int updateEpisodeDownload(long id, String downloadPath, long downloadedAt) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(DatabaseHelper.COL_EPISODE_DOWNLOAD_PATH, downloadPath);
+        values.put(DatabaseHelper.COL_EPISODE_DOWNLOADED_AT, downloadedAt);
+
+        return db.update(
+            DatabaseHelper.TABLE_EPISODES,
+            values,
+            DatabaseHelper.COL_EPISODE_ID + " = ?",
+            new String[]{String.valueOf(id)}
+        );
+    }
+
+    /**
      * Get all episodes with a specific state.
      * @param state The episode state to filter by
      * @return List of episodes in the specified state
