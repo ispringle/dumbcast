@@ -23,6 +23,7 @@ import com.ispringle.dumbcast.data.EpisodeRepository;
 import com.ispringle.dumbcast.data.EpisodeState;
 import com.ispringle.dumbcast.data.Podcast;
 import com.ispringle.dumbcast.data.PodcastRepository;
+import com.ispringle.dumbcast.services.DownloadService;
 import com.ispringle.dumbcast.services.PlaybackService;
 
 import java.lang.ref.WeakReference;
@@ -223,8 +224,9 @@ public class EpisodeListFragment extends Fragment {
             // We need to pass the episode to the service before navigating
             startPlaybackAndNavigate(episode);
         } else {
-            // TODO: Implement download
-            Toast.makeText(getContext(), "Episode not downloaded. Download functionality coming soon.", Toast.LENGTH_LONG).show();
+            // Start download
+            DownloadService.startDownload(getContext(), episode.getId());
+            Toast.makeText(getContext(), "Download started", Toast.LENGTH_SHORT).show();
         }
     }
 
