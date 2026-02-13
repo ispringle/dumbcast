@@ -23,6 +23,11 @@
             </intent-filter>
         </activity>
 
+        <service
+            android:name=".services.PlaybackService"
+            android:enabled="true"
+            android:exported="false" />
+
     </application>
 
 </manifest>
