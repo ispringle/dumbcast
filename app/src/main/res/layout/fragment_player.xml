@@ -28,24 +28,13 @@
     <!-- Episode/Podcast Image -->
     <ImageView
         android:id="@+id/player_artwork"
-        android:layout_width="120dp"
-        android:layout_height="120dp"
+        android:layout_width="150dp"
+        android:layout_height="150dp"
         android:layout_marginTop="4dp"
         android:layout_marginBottom="8dp"
         android:scaleType="centerInside"
         android:src="@drawable/ic_podcast_brain"
         android:contentDescription="@string/artwork_description" />
-
-    <!-- Podcast Name -->
-    <TextView
-        android:id="@+id/player_podcast_name"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text=""
-        android:textSize="11sp"
-        android:textColor="?android:attr/textColorSecondary"
-        android:gravity="center"
-        android:paddingBottom="8dp" />
 
     <!-- Progress Container: Time + Progress Bar + Time -->
     <LinearLayout

@@ -59,7 +59,6 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
     // UI Components
     private ImageView artworkImage;
     private TextView episodeTitleText;
-    private TextView podcastNameText;
     private TextView chapterNameText;
     private TextView progressText;
     private TextView elapsedTimeText;
@@ -104,7 +103,6 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
         // Initialize UI components
         artworkImage = view.findViewById(R.id.player_artwork);
         episodeTitleText = view.findViewById(R.id.player_episode_title);
-        podcastNameText = view.findViewById(R.id.player_podcast_name);
         chapterNameText = view.findViewById(R.id.player_chapter_name);
         progressText = view.findViewById(R.id.player_progress_text);
         playPauseButton = view.findViewById(R.id.player_play_pause);
@@ -276,12 +274,9 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
         // Update episode info
         episodeTitleText.setText(currentEpisode.getTitle());
 
-        // Load podcast name and artwork
+        // Load podcast artwork
         Podcast podcast = podcastRepository.getPodcastById(currentEpisode.getPodcastId());
         if (podcast != null) {
-            podcastNameText.setText(podcast.getTitle());
-            podcastNameText.setVisibility(View.VISIBLE);
-
             // Load artwork with fallback: try episode artwork first, fall back to podcast artwork
             // Note: Episode.artworkUrl doesn't exist yet, so primaryUrl is always null for now
             // This prepares the infrastructure for when episode-level artwork is added
@@ -290,8 +285,6 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
             ImageLoader.getInstance(getContext()).loadImageWithFallback(
                 getContext(), episodeArtworkUrl, podcastArtworkUrl, artworkImage);
         } else {
-            podcastNameText.setVisibility(View.GONE);
-
             // No podcast found, show placeholder
             artworkImage.setBackgroundColor(0);
             artworkImage.setImageResource(R.drawable.ic_podcast_brain);
@@ -320,7 +313,6 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
         artworkImage.setBackgroundColor(0);
         artworkImage.setImageResource(R.drawable.ic_podcast_brain);
         episodeTitleText.setText(R.string.no_episode_loaded);
-        podcastNameText.setVisibility(View.GONE);
         chapterNameText.setVisibility(View.GONE);
         elapsedTimeText.setText("0:00");
         totalTimeText.setText("0:00");
