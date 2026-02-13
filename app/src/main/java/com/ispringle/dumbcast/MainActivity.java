@@ -1,34 +1,42 @@
 package com.ispringle.dumbcast;
 
 import android.os.Bundle;
-import android.support.design.widget.TabLayout;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AppCompatActivity;
 import android.view.KeyEvent;
+import android.widget.TextView;
 
 import com.ispringle.dumbcast.data.DatabaseHelper;
 import com.ispringle.dumbcast.data.DatabaseManager;
 import com.ispringle.dumbcast.data.EpisodeRepository;
+import com.ispringle.dumbcast.data.EpisodeState;
 import com.ispringle.dumbcast.fragments.DiscoveryFragment;
+import com.ispringle.dumbcast.fragments.EpisodeListFragment;
+import com.ispringle.dumbcast.fragments.NewFragment;
 import com.ispringle.dumbcast.fragments.PlayerFragment;
 import com.ispringle.dumbcast.fragments.SubscriptionsFragment;
 
 /**
  * Main activity providing tabbed navigation for the podcast app.
- * Tabs: New, Backlog, Subscriptions, Discovery
+ * Tabs: New, Backlog, Subscriptions, Discover, Now Playing
  * Implements keypad event handling for KaiOS devices.
  */
 public class MainActivity extends AppCompatActivity {
 
-    private TabLayout tabLayout;
+    private TextView tabIndicator;
     private EpisodeRepository episodeRepository;
 
     // Tab indices
     private static final int TAB_NEW = 0;
     private static final int TAB_BACKLOG = 1;
     private static final int TAB_SUBSCRIPTIONS = 2;
-    private static final int TAB_DISCOVERY = 3;
+    private static final int TAB_DISCOVER = 3;
+    private static final int TAB_NOW_PLAYING = 4;
+    private static final int TAB_COUNT = 5;
+
+    // Current tab (default to Subscriptions)
+    private int currentTab = TAB_SUBSCRIPTIONS;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,74 +47,98 @@ public class MainActivity extends AppCompatActivity {
         DatabaseHelper dbHelper = DatabaseManager.getInstance(this);
         episodeRepository = new EpisodeRepository(dbHelper);
 
-        // Run episode decay on background thread to avoid blocking app startup
+        // Run episode maintenance on background thread to avoid blocking app startup
         new Thread(new Runnable() {
             @Override
             public void run() {
+                // Decay old NEW episodes to AVAILABLE
                 episodeRepository.decayNewEpisodes();
+
+                // Fix state for downloaded episodes (migration fix)
+                // Downloaded episodes should be in BACKLOG state, not NEW
+                episodeRepository.fixDownloadedEpisodesState();
             }
         }).start();
 
-        // Setup TabLayout
-        tabLayout = findViewById(R.id.tab_layout);
-        setupTabs();
+        // Setup tab indicator
+        tabIndicator = findViewById(R.id.tab_indicator);
+        updateTabIndicator();
 
         // Set initial fragment if this is first creation
         if (savedInstanceState == null) {
-            loadFragment(SubscriptionsFragment.newInstance());
+            loadFragmentForTab(currentTab);
         }
     }
 
     /**
-     * Configure the TabLayout with all four tabs and handle selection.
+     * Get the localized tab name for the given tab index.
+     * @param tabIndex The index of the tab
+     * @return The localized string resource for the tab name
      */
-    private void setupTabs() {
-        tabLayout.addTab(tabLayout.newTab().setText(R.string.tab_new));
-        tabLayout.addTab(tabLayout.newTab().setText(R.string.tab_backlog));
-        tabLayout.addTab(tabLayout.newTab().setText(R.string.tab_subscriptions));
-        tabLayout.addTab(tabLayout.newTab().setText(R.string.tab_discovery));
-
-        // Set Subscriptions tab as initially selected
-        tabLayout.getTabAt(TAB_SUBSCRIPTIONS).select();
-
-        tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
-            @Override
-            public void onTabSelected(TabLayout.Tab tab) {
-                handleTabSelection(tab.getPosition());
-            }
-
-            @Override
-            public void onTabUnselected(TabLayout.Tab tab) {
-                // No action needed
-            }
-
-            @Override
-            public void onTabReselected(TabLayout.Tab tab) {
-                // No action needed
-            }
-        });
+    private String getTabName(int tabIndex) {
+        switch (tabIndex) {
+            case TAB_NEW:
+                return getString(R.string.tab_new);
+            case TAB_BACKLOG:
+                return getString(R.string.tab_backlog);
+            case TAB_SUBSCRIPTIONS:
+                return getString(R.string.tab_subscriptions);
+            case TAB_DISCOVER:
+                return getString(R.string.tab_discovery);
+            case TAB_NOW_PLAYING:
+                return getString(R.string.tab_now_playing);
+            default:
+                return "";
+        }
     }
 
     /**
-     * Handle tab selection and load appropriate fragment.
+     * Update the tab indicator text to show current tab with arrows.
      */
-    private void handleTabSelection(int position) {
+    private void updateTabIndicator() {
+        String tabName = getTabName(currentTab);
+        tabIndicator.setText("← " + tabName + " →");
+    }
+
+    /**
+     * Navigate to a different tab with wrapping.
+     * @param direction -1 for previous, 1 for next
+     */
+    private void navigateTab(int direction) {
+        currentTab = currentTab + direction;
+
+        // Wrap around at boundaries
+        if (currentTab < 0) {
+            currentTab = TAB_COUNT - 1;
+        } else if (currentTab >= TAB_COUNT) {
+            currentTab = 0;
+        }
+
+        updateTabIndicator();
+        loadFragmentForTab(currentTab);
+    }
+
+    /**
+     * Load the appropriate fragment for the given tab index.
+     */
+    private void loadFragmentForTab(int tabIndex) {
         Fragment fragment = null;
 
-        switch (position) {
+        switch (tabIndex) {
             case TAB_NEW:
-                // TODO: Implement NewFragment
-                fragment = createStubFragment("New");
+                fragment = NewFragment.newInstance();
                 break;
             case TAB_BACKLOG:
-                // TODO: Implement BacklogFragment
-                fragment = createStubFragment("Backlog");
+                fragment = EpisodeListFragment.newInstanceForState(EpisodeState.BACKLOG);
                 break;
             case TAB_SUBSCRIPTIONS:
                 fragment = SubscriptionsFragment.newInstance();
                 break;
-            case TAB_DISCOVERY:
+            case TAB_DISCOVER:
                 fragment = DiscoveryFragment.newInstance();
+                break;
+            case TAB_NOW_PLAYING:
+                fragment = PlayerFragment.newInstance();
                 break;
         }
 
@@ -125,26 +157,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Create a placeholder fragment for unimplemented tabs.
-     * This will be removed once all fragments are implemented.
-     */
-    private Fragment createStubFragment(String tabName) {
-        // For now, return the subscriptions fragment as a placeholder
-        // In the future, this will be removed when actual fragments are implemented
-        return SubscriptionsFragment.newInstance();
-    }
-
-    /**
      * Handle keypad events for KaiOS navigation.
      * This provides support for physical keypad navigation on KaiOS devices.
      */
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         switch (keyCode) {
-            case KeyEvent.KEYCODE_0:
-                // 0 key: Navigate to PlayerFragment
-                loadFragment(PlayerFragment.newInstance());
-                return true;
             case KeyEvent.KEYCODE_DPAD_LEFT:
                 // Navigate to previous tab
                 navigateTab(-1);
@@ -162,27 +180,6 @@ public class MainActivity extends AppCompatActivity {
                 return super.onKeyDown(keyCode, event);
             default:
                 return super.onKeyDown(keyCode, event);
-        }
-    }
-
-    /**
-     * Navigate between tabs using left/right keypad buttons.
-     * @param direction -1 for previous tab, 1 for next tab
-     */
-    private void navigateTab(int direction) {
-        int currentTab = tabLayout.getSelectedTabPosition();
-        int newTab = currentTab + direction;
-
-        // Wrap around at boundaries
-        if (newTab < 0) {
-            newTab = tabLayout.getTabCount() - 1;
-        } else if (newTab >= tabLayout.getTabCount()) {
-            newTab = 0;
-        }
-
-        TabLayout.Tab tab = tabLayout.getTabAt(newTab);
-        if (tab != null) {
-            tab.select();
         }
     }
 }
