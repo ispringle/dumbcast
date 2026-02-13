@@ -1,0 +1,5 @@
+# Android SDK location
+# Uncomment and set to your SDK path:
+# sdk.dir=/Users/YourUsername/Library/Android/sdk
+# or on Linux:
+# sdk.dir=/home/YourUsername/Android/Sdk
