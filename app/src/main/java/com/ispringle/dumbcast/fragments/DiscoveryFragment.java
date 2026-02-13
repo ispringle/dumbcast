@@ -517,10 +517,10 @@ public class DiscoveryFragment extends Fragment {
                 }
                 Log.d(TAG, "Podcast inserted with ID: " + podcastId);
 
-                // Refresh podcast to fetch episodes
-                Log.d(TAG, "Fetching episodes...");
-                repository.refreshPodcast(podcastId);
-                Log.d(TAG, "Episodes fetched successfully");
+                // Fetch initial episodes for new subscription (all BACKLOG, no NEW pressure)
+                Log.d(TAG, "Fetching initial episodes...");
+                repository.fetchInitialEpisodes(podcastId);
+                Log.d(TAG, "Initial episodes fetched successfully");
 
                 return SubscribeResult.success();
             } catch (IOException e) {

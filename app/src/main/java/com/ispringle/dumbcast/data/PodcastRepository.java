@@ -159,6 +159,37 @@ public class PodcastRepository {
     }
 
     /**
+     * Fetch episodes for a newly subscribed podcast.
+     * Sets all episodes to BACKLOG (no NEW pressure) and skips description storage.
+     * @param podcastId The ID of the podcast
+     * @throws IOException If network or I/O error occurs
+     * @throws XmlPullParserException If XML parsing error occurs
+     */
+    public void fetchInitialEpisodes(long podcastId) throws IOException, XmlPullParserException {
+        Podcast podcast = getPodcastById(podcastId);
+        if (podcast == null) {
+            Log.e(TAG, "Cannot fetch episodes: Podcast not found (ID: " + podcastId + ")");
+            return;
+        }
+
+        Log.d(TAG, "Fetching initial episodes for new subscription: " + podcast.getTitle());
+
+        // Fetch and parse RSS feed
+        RssFeed feed = fetchFeed(podcast.getFeedUrl());
+
+        // Update podcast metadata from feed
+        updatePodcastFromFeed(podcast, feed);
+
+        // Insert episodes with initial subscription flag (all BACKLOG, no descriptions)
+        insertEpisodesFromFeed(podcastId, feed, 10, true);
+
+        // Update last refresh timestamp
+        updateLastRefresh(podcastId);
+
+        Log.d(TAG, "Successfully fetched initial episodes: " + podcast.getTitle());
+    }
+
+    /**
      * Refresh a podcast's feed if it hasn't been refreshed in the last hour.
      * Fetches RSS feed, parses it, and inserts new episodes.
      * Updates podcast metadata from feed.
@@ -187,8 +218,8 @@ public class PodcastRepository {
         // Update podcast metadata from feed
         updatePodcastFromFeed(podcast, feed);
 
-        // Insert new episodes from feed (limit to 10 most recent)
-        insertEpisodesFromFeed(podcastId, feed, 10);
+        // Insert new episodes from feed (limit to 10 most recent, not initial subscription)
+        insertEpisodesFromFeed(podcastId, feed, 10, false);
 
         // Update last refresh timestamp
         updateLastRefresh(podcastId);
@@ -219,8 +250,8 @@ public class PodcastRepository {
         // Update podcast metadata from feed
         updatePodcastFromFeed(podcast, feed);
 
-        // Insert new episodes from feed with custom limit
-        insertEpisodesFromFeed(podcastId, feed, maxNewEpisodes);
+        // Insert new episodes from feed with custom limit (not initial subscription)
+        insertEpisodesFromFeed(podcastId, feed, maxNewEpisodes, false);
 
         // Update last refresh timestamp
         updateLastRefresh(podcastId);
@@ -368,8 +399,9 @@ public class PodcastRepository {
      * @param podcastId The ID of the podcast
      * @param feed The RSS feed containing episodes
      * @param maxNewEpisodes Maximum number of NEW episodes to insert (0 = unlimited)
+     * @param isInitialSubscription If true, all episodes go to BACKLOG (no NEW pressure), no descriptions stored
      */
-    private void insertEpisodesFromFeed(long podcastId, RssFeed feed, int maxNewEpisodes) {
+    private void insertEpisodesFromFeed(long podcastId, RssFeed feed, int maxNewEpisodes, boolean isInitialSubscription) {
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         long now = System.currentTimeMillis();
         int newEpisodeCount = 0;
@@ -440,18 +472,28 @@ public class PodcastRepository {
                 );
 
                 // Set optional fields
-                // NOTE: Skip description for non-downloaded episodes to save DB space
-                // Description will be stored when episode is downloaded
                 episode.setEnclosureType(item.getEnclosureType());
                 episode.setEnclosureLength(item.getEnclosureLength());
                 episode.setDuration(item.getDuration());
                 episode.setChaptersUrl(item.getChaptersUrl());
                 episode.setFetchedAt(now);
 
-                // Set session grace for old episodes (published > 7 days ago)
                 long publishedAt = item.getPublishedAt();
-                if (publishedAt > 0 && (now - publishedAt) > SEVEN_DAYS_MS) {
+                boolean isOldEpisode = publishedAt > 0 && (now - publishedAt) > SEVEN_DAYS_MS;
+
+                if (isInitialSubscription) {
+                    // Initial subscription: All episodes go to BACKLOG (no NEW pressure)
+                    // No description stored (saves ~5-10KB per episode)
+                    episode.setState(EpisodeState.BACKLOG);
                     episode.setSessionGrace(true);
+                } else {
+                    // Subsequent refresh: Recent episodes are NEW with description
+                    if (isOldEpisode) {
+                        episode.setSessionGrace(true);
+                    } else {
+                        // Store description for NEW episodes (likely to be read soon)
+                        episode.setDescription(item.getDescription());
+                    }
                 }
 
                 // Insert episode

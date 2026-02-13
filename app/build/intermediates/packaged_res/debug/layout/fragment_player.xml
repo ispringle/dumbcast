@@ -89,16 +89,14 @@
     <!-- Play/Pause Button -->
     <TextView
         android:id="@+id/player_play_pause"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/button_play"
-        android:textSize="20sp"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:text=""
         android:gravity="center"
         android:padding="16dp"
         android:clickable="true"
         android:focusable="true"
-        android:background="?android:attr/selectableItemBackground"
-        android:textStyle="bold" />
+        android:background="?android:attr/selectableItemBackground" />
 
     <!-- Current chapter (initially hidden, kept for future use) -->
     <TextView

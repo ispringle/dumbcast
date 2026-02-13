@@ -292,9 +292,9 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
 
         // Update play/pause button
         if (playbackService.isPlaying()) {
-            playPauseButton.setText(R.string.button_pause);
+            playPauseButton.setText("");
         } else {
-            playPauseButton.setText(R.string.button_play);
+            playPauseButton.setText("");
         }
 
         // Update progress
@@ -317,7 +317,7 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
         elapsedTimeText.setText("0:00");
         totalTimeText.setText("0:00");
         progressBar.setProgress(0);
-        playPauseButton.setText(R.string.button_play);
+        playPauseButton.setText("");
         statusMessage.setText(R.string.load_episode_message);
         statusMessage.setVisibility(View.VISIBLE);
     }
@@ -370,7 +370,7 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
             getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    playPauseButton.setText(R.string.button_pause);
+                    playPauseButton.setText("");
                 }
             });
         }
@@ -383,7 +383,7 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
             getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    playPauseButton.setText(R.string.button_play);
+                    playPauseButton.setText("");
                 }
             });
         }
@@ -409,7 +409,7 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
             getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
-                    playPauseButton.setText(R.string.button_play);
+                    playPauseButton.setText("");
                     statusMessage.setText("Finished");
                     statusMessage.setVisibility(View.VISIBLE);
                     Toast.makeText(getContext(), "Episode finished", Toast.LENGTH_SHORT).show();
@@ -584,7 +584,7 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
 
         // Create input dialog
         final EditText input = new EditText(getContext());
-        input.setInputType(InputType.TYPE_CLASS_DATETIME);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
         input.setHint(getString(R.string.player_timestamp_hint));
 
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
