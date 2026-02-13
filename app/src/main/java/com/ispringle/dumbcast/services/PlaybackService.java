@@ -46,7 +46,7 @@ public class PlaybackService extends Service {
     private static final String CHANNEL_ID = "playback_channel";
     private static final int NOTIFICATION_ID = 1;
     private static final int SKIP_FORWARD_MS = 30000; // 30 seconds
-    private static final int SKIP_BACKWARD_MS = 15000; // 15 seconds
+    private static final int SKIP_BACKWARD_MS = 30000; // 30 seconds
     private static final int POSITION_UPDATE_INTERVAL_MS = 10000; // 10 seconds
 
     // Actions for notification buttons and service control
@@ -231,6 +231,12 @@ public class PlaybackService extends Service {
             return;
         }
 
+        if (mediaPlayer == null) {
+            Log.e(TAG, "MediaPlayer is null, cannot load episode");
+            notifyError("Playback not available");
+            return;
+        }
+
         // Stop current playback if any
         if (isPlaying) {
             pause();
@@ -244,6 +250,12 @@ public class PlaybackService extends Service {
             audioUrl = episode.getDownloadPath();
         } else {
             audioUrl = episode.getEnclosureUrl();
+        }
+
+        if (audioUrl == null || audioUrl.isEmpty()) {
+            Log.e(TAG, "No valid audio URL for episode");
+            notifyError("Episode has no audio file");
+            return;
         }
 
         try {
@@ -264,7 +276,16 @@ public class PlaybackService extends Service {
 
         } catch (IOException e) {
             Log.e(TAG, "Error loading episode", e);
+            // Clear any listeners that may have been set
+            mediaPlayer.setOnSeekCompleteListener(null);
+            // Reset currentEpisode since load failed
+            currentEpisode = null;
             notifyError("Failed to load episode: " + e.getMessage());
+        } catch (IllegalStateException e) {
+            Log.e(TAG, "MediaPlayer in invalid state", e);
+            mediaPlayer.setOnSeekCompleteListener(null);
+            currentEpisode = null;
+            notifyError("Playback error - please try again");
         }
     }
 
