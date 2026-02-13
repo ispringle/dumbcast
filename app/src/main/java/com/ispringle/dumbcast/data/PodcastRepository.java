@@ -113,6 +113,33 @@ public class PodcastRepository {
     }
 
     /**
+     * Get a podcast by its feed URL.
+     * @param feedUrl The RSS feed URL
+     * @return The podcast if found, null otherwise
+     */
+    public Podcast getPodcastByFeedUrl(String feedUrl) {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        Cursor cursor = db.query(
+            DatabaseHelper.TABLE_PODCASTS,
+            null,
+            DatabaseHelper.COL_PODCAST_FEED_URL + " = ?",
+            new String[]{feedUrl},
+            null,
+            null,
+            null
+        );
+
+        Podcast podcast = null;
+        if (cursor != null) {
+            if (cursor.moveToFirst()) {
+                podcast = cursorToPodcast(cursor);
+            }
+            cursor.close();
+        }
+        return podcast;
+    }
+
+    /**
      * Delete a podcast and all its episodes from the database.
      * Foreign key constraints will cascade the delete to episodes.
      * @param podcastId The ID of the podcast to delete
