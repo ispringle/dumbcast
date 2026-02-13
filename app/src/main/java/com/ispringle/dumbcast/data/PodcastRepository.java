@@ -482,9 +482,9 @@ public class PodcastRepository {
                 boolean isOldEpisode = publishedAt > 0 && (now - publishedAt) > SEVEN_DAYS_MS;
 
                 if (isInitialSubscription) {
-                    // Initial subscription: All episodes go to BACKLOG (no NEW pressure)
+                    // Initial subscription: Give session grace (old episodes won't bug you)
                     // No description stored (saves ~5-10KB per episode)
-                    episode.setState(EpisodeState.BACKLOG);
+                    // BACKLOG should be manual only, so don't set state
                     episode.setSessionGrace(true);
                 } else {
                     // Subsequent refresh: Recent episodes are NEW with description

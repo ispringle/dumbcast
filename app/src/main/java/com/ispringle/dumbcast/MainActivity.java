@@ -36,6 +36,9 @@ public class MainActivity extends AppCompatActivity {
     private static final int TAB_NOW_PLAYING = 4;
     private static final int TAB_COUNT = 5;
 
+    // Intent extras
+    public static final String EXTRA_NAVIGATE_TO_TAB = "navigate_to_tab";
+
     // Current tab (default to Subscriptions)
     private int currentTab = TAB_SUBSCRIPTIONS;
 
@@ -49,9 +52,12 @@ public class MainActivity extends AppCompatActivity {
         episodeRepository = new EpisodeRepository(dbHelper);
         PodcastRepository podcastRepository = new PodcastRepository(dbHelper);
 
-        // On first launch, check if there are any subscriptions
-        // If none, start on Discovery tab instead of Subscriptions
-        if (savedInstanceState == null) {
+        // Check if we should navigate to a specific tab (e.g., from notification)
+        if (getIntent() != null && getIntent().hasExtra(EXTRA_NAVIGATE_TO_TAB)) {
+            currentTab = getIntent().getIntExtra(EXTRA_NAVIGATE_TO_TAB, TAB_SUBSCRIPTIONS);
+        } else if (savedInstanceState == null) {
+            // On first launch, check if there are any subscriptions
+            // If none, start on Discovery tab instead of Subscriptions
             if (podcastRepository.getAllPodcasts().isEmpty()) {
                 currentTab = TAB_DISCOVER;
             }

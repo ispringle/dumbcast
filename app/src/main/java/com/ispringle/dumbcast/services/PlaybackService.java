@@ -740,8 +740,10 @@ public class PlaybackService extends Service {
      * Build notification with playback controls
      */
     private Notification buildNotification() {
-        // Intent to open app when notification is clicked
+        // Intent to open app and navigate to Now Playing tab when notification is clicked
         Intent intent = new Intent(this, MainActivity.class);
+        intent.putExtra(MainActivity.EXTRA_NAVIGATE_TO_TAB, 4); // TAB_NOW_PLAYING
+        intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent pendingIntent = PendingIntent.getActivity(
             this,
             0,
