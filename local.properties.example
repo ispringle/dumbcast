@@ -1,5 +1,10 @@
 # Android SDK location
-# Uncomment and set to your SDK path:
-# sdk.dir=/Users/YourUsername/Library/Android/sdk
+# Set to your SDK path:
+sdk.dir=/Users/YourUsername/Library/Android/sdk
 # or on Linux:
 # sdk.dir=/home/YourUsername/Android/Sdk
+
+# Podcast Index API credentials
+# Get your keys from https://api.podcastindex.org/
+podcastindex.apiKey=YOUR_API_KEY_HERE
+podcastindex.apiSecret=YOUR_API_SECRET_HERE

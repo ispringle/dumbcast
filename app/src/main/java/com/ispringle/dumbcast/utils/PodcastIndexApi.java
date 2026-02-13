@@ -1,5 +1,7 @@
 package com.ispringle.dumbcast.utils;
 
+import com.ispringle.dumbcast.BuildConfig;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -16,9 +18,11 @@ import java.util.List;
 public class PodcastIndexApi {
     private static final String BASE_URL = "https://api.podcastindex.org/api/1.0";
 
-    // TODO: Move these to secure storage (Android Keystore)
-    private static final String API_KEY = "YOUR_API_KEY_HERE";
-    private static final String API_SECRET = "YOUR_API_SECRET_HERE";
+    // API keys loaded from local.properties via BuildConfig
+    // Get your keys from https://api.podcastindex.org/
+    // Add them to local.properties (see local.properties.example)
+    private static final String API_KEY = BuildConfig.PODCAST_INDEX_API_KEY;
+    private static final String API_SECRET = BuildConfig.PODCAST_INDEX_API_SECRET;
     private static final String USER_AGENT = "Dumbcast/1.0";
 
     /**

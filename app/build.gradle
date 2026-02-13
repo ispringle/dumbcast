@@ -2,9 +2,20 @@ plugins {
     id 'com.android.application'
 }
 
+// Load API keys from local.properties
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+
 android {
     namespace 'com.ispringle.dumbcast'
     compileSdk 27
+
+    buildFeatures {
+        buildConfig true
+    }
 
     defaultConfig {
         applicationId "com.ispringle.dumbcast"
@@ -13,6 +24,10 @@ android {
         versionCode 1
         versionName "0.1.0"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+
+        // Inject API keys into BuildConfig
+        buildConfigField "String", "PODCAST_INDEX_API_KEY", "\"${localProperties.getProperty('podcastindex.apiKey', 'YOUR_API_KEY_HERE')}\""
+        buildConfigField "String", "PODCAST_INDEX_API_SECRET", "\"${localProperties.getProperty('podcastindex.apiSecret', 'YOUR_API_SECRET_HERE')}\""
     }
 
     buildTypes {
