@@ -9,6 +9,7 @@ import android.view.KeyEvent;
 
 import com.ispringle.dumbcast.data.DatabaseHelper;
 import com.ispringle.dumbcast.data.EpisodeRepository;
+import com.ispringle.dumbcast.fragments.DiscoveryFragment;
 import com.ispringle.dumbcast.fragments.PlayerFragment;
 import com.ispringle.dumbcast.fragments.SubscriptionsFragment;
 
@@ -82,7 +83,6 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * Handle tab selection and load appropriate fragment.
-     * Currently only Subscriptions is implemented; others are stubs.
      */
     private void handleTabSelection(int position) {
         Fragment fragment = null;
@@ -100,8 +100,7 @@ public class MainActivity extends AppCompatActivity {
                 fragment = SubscriptionsFragment.newInstance();
                 break;
             case TAB_DISCOVERY:
-                // TODO: Implement DiscoveryFragment
-                fragment = createStubFragment("Discovery");
+                fragment = DiscoveryFragment.newInstance();
                 break;
         }
 

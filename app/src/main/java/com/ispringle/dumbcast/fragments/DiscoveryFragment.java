@@ -1,0 +1,412 @@
+package com.ispringle.dumbcast.fragments;
+
+import android.os.AsyncTask;
+import android.os.Bundle;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentTransaction;
+import android.util.Log;
+import android.view.KeyEvent;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ListView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import com.ispringle.dumbcast.R;
+import com.ispringle.dumbcast.data.DatabaseHelper;
+import com.ispringle.dumbcast.data.Podcast;
+import com.ispringle.dumbcast.data.PodcastRepository;
+import com.ispringle.dumbcast.utils.PodcastIndexApi;
+import com.ispringle.dumbcast.utils.RssFeed;
+import com.ispringle.dumbcast.utils.RssParser;
+
+import org.xmlpull.v1.XmlPullParserException;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.ref.WeakReference;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Fragment for discovering and searching podcasts using Podcast Index API.
+ * Allows users to search for podcasts and subscribe to them.
+ */
+public class DiscoveryFragment extends Fragment {
+
+    private static final String TAG = "DiscoveryFragment";
+    private static final int TAB_SUBSCRIPTIONS = 2;
+
+    private EditText searchInput;
+    private Button searchButton;
+    private TextView statusMessage;
+    private ListView resultsList;
+    private SearchResultAdapter adapter;
+    private PodcastRepository podcastRepository;
+
+    public DiscoveryFragment() {
+        // Required empty public constructor
+    }
+
+    public static DiscoveryFragment newInstance() {
+        return new DiscoveryFragment();
+    }
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        // Initialize repository
+        DatabaseHelper dbHelper = new DatabaseHelper(getContext());
+        podcastRepository = new PodcastRepository(dbHelper);
+    }
+
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.fragment_discovery, container, false);
+
+        searchInput = view.findViewById(R.id.search_input);
+        searchButton = view.findViewById(R.id.search_button);
+        statusMessage = view.findViewById(R.id.status_message);
+        resultsList = view.findViewById(R.id.results_list);
+
+        // Initialize adapter with empty list
+        adapter = new SearchResultAdapter(getContext(), new ArrayList<PodcastIndexApi.SearchResult>());
+        resultsList.setAdapter(adapter);
+
+        // Set up search button click listener
+        searchButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                performSearch();
+            }
+        });
+
+        // Set up Enter key listener on search input
+        searchInput.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+                if (actionId == EditorInfo.IME_ACTION_SEARCH ||
+                    (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER &&
+                     event.getAction() == KeyEvent.ACTION_DOWN)) {
+                    performSearch();
+                    return true;
+                }
+                return false;
+            }
+        });
+
+        // Set up result item click listener
+        resultsList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                PodcastIndexApi.SearchResult result = adapter.getItem(position);
+                if (result != null) {
+                    showSubscribeDialog(result);
+                }
+            }
+        });
+
+        return view;
+    }
+
+    /**
+     * Perform search with the current input value.
+     */
+    private void performSearch() {
+        String query = searchInput.getText().toString().trim();
+
+        if (query.isEmpty()) {
+            showStatus(getString(R.string.error_empty_search));
+            return;
+        }
+
+        // Clear previous results
+        adapter.clear();
+        adapter.notifyDataSetChanged();
+
+        // Show searching status
+        showStatus(getString(R.string.searching));
+
+        // Perform search in background
+        new SearchTask(this).execute(query);
+    }
+
+    /**
+     * Update the UI with search results.
+     * @param results List of search results
+     */
+    private void updateSearchResults(List<PodcastIndexApi.SearchResult> results) {
+        adapter.clear();
+        if (results != null && !results.isEmpty()) {
+            adapter.addAll(results);
+            hideStatus();
+        } else {
+            showStatus(getString(R.string.no_results));
+        }
+        adapter.notifyDataSetChanged();
+
+        Log.d(TAG, "Loaded " + (results != null ? results.size() : 0) + " search results");
+    }
+
+    /**
+     * Show an error message to the user.
+     * @param error Error message
+     */
+    private void showError(String error) {
+        showStatus(error);
+        Toast.makeText(getContext(), error, Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * Show a status message.
+     * @param message Status message
+     */
+    private void showStatus(String message) {
+        statusMessage.setText(message);
+        statusMessage.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * Hide the status message.
+     */
+    private void hideStatus() {
+        statusMessage.setVisibility(View.GONE);
+    }
+
+    /**
+     * Show a simple subscribe confirmation dialog (using Toast for KaiOS simplicity).
+     * @param result The search result to subscribe to
+     */
+    private void showSubscribeDialog(final PodcastIndexApi.SearchResult result) {
+        // For KaiOS, we'll show a simple confirmation with a toast
+        // and subscribe directly
+        String message = "Subscribe to \"" + result.getTitle() + "\"?";
+        Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
+
+        // Subscribe immediately
+        subscribeToResult(result);
+    }
+
+    /**
+     * Subscribe to a search result by fetching its RSS feed and creating a podcast.
+     * @param result The search result to subscribe to
+     */
+    private void subscribeToResult(PodcastIndexApi.SearchResult result) {
+        showStatus(getString(R.string.subscribing));
+        new SubscribeTask(this, podcastRepository, result).execute();
+    }
+
+    /**
+     * Handle successful subscription.
+     */
+    private void onSubscribeSuccess() {
+        Toast.makeText(getContext(), getString(R.string.subscribed), Toast.LENGTH_LONG).show();
+        hideStatus();
+
+        // Navigate to subscriptions tab
+        navigateToSubscriptions();
+    }
+
+    /**
+     * Handle subscription failure.
+     */
+    private void onSubscribeFailure() {
+        showError(getString(R.string.error_subscribe));
+    }
+
+    /**
+     * Navigate to the Subscriptions fragment.
+     */
+    private void navigateToSubscriptions() {
+        // Navigate to subscriptions fragment
+        SubscriptionsFragment fragment = SubscriptionsFragment.newInstance();
+
+        FragmentTransaction transaction = getActivity().getSupportFragmentManager().beginTransaction();
+        transaction.replace(R.id.fragment_container, fragment);
+        transaction.commit();
+
+        Log.d(TAG, "Navigating to subscriptions");
+    }
+
+    /**
+     * AsyncTask to search for podcasts on a background thread.
+     */
+    private static class SearchTask extends AsyncTask<String, Void, SearchTaskResult> {
+        private final WeakReference<DiscoveryFragment> fragmentRef;
+
+        SearchTask(DiscoveryFragment fragment) {
+            this.fragmentRef = new WeakReference<>(fragment);
+        }
+
+        @Override
+        protected SearchTaskResult doInBackground(String... params) {
+            String query = params[0];
+            try {
+                List<PodcastIndexApi.SearchResult> results = PodcastIndexApi.search(query);
+                return new SearchTaskResult(results, null);
+            } catch (Exception e) {
+                Log.e(TAG, "Search failed", e);
+                return new SearchTaskResult(null, e.getMessage());
+            }
+        }
+
+        @Override
+        protected void onPostExecute(SearchTaskResult result) {
+            DiscoveryFragment fragment = fragmentRef.get();
+            if (fragment == null) return;
+
+            if (result.error != null) {
+                fragment.showError(fragment.getString(R.string.error_network));
+            } else {
+                fragment.updateSearchResults(result.results);
+            }
+        }
+    }
+
+    /**
+     * Result container for SearchTask.
+     */
+    private static class SearchTaskResult {
+        final List<PodcastIndexApi.SearchResult> results;
+        final String error;
+
+        SearchTaskResult(List<PodcastIndexApi.SearchResult> results, String error) {
+            this.results = results;
+            this.error = error;
+        }
+    }
+
+    /**
+     * AsyncTask to subscribe to a podcast on a background thread.
+     */
+    private static class SubscribeTask extends AsyncTask<Void, Void, Boolean> {
+        private final WeakReference<DiscoveryFragment> fragmentRef;
+        private final PodcastRepository repository;
+        private final PodcastIndexApi.SearchResult result;
+
+        SubscribeTask(DiscoveryFragment fragment, PodcastRepository repository,
+                     PodcastIndexApi.SearchResult result) {
+            this.fragmentRef = new WeakReference<>(fragment);
+            this.repository = repository;
+            this.result = result;
+        }
+
+        @Override
+        protected Boolean doInBackground(Void... voids) {
+            try {
+                // Fetch RSS feed
+                RssFeed feed = fetchFeed(result.getFeedUrl());
+
+                // Create podcast object
+                Podcast podcast = new Podcast(0, result.getFeedUrl(), result.getTitle());
+                podcast.setDescription(result.getDescription());
+                podcast.setArtworkUrl(result.getArtworkUrl());
+                podcast.setPodcastIndexId(result.getId());
+
+                // Insert podcast into database
+                long podcastId = repository.insertPodcast(podcast);
+                if (podcastId == -1) {
+                    Log.e(TAG, "Failed to insert podcast");
+                    return false;
+                }
+
+                // Refresh podcast to fetch episodes
+                repository.refreshPodcast(podcastId);
+
+                return true;
+            } catch (Exception e) {
+                Log.e(TAG, "Subscribe failed", e);
+                return false;
+            }
+        }
+
+        @Override
+        protected void onPostExecute(Boolean success) {
+            DiscoveryFragment fragment = fragmentRef.get();
+            if (fragment == null) return;
+
+            if (success) {
+                fragment.onSubscribeSuccess();
+            } else {
+                fragment.onSubscribeFailure();
+            }
+        }
+
+        /**
+         * Fetch RSS feed from the given URL using HttpURLConnection.
+         * @param feedUrl The URL of the RSS feed
+         * @return Parsed RssFeed object
+         * @throws IOException If network or I/O error occurs
+         * @throws XmlPullParserException If XML parsing error occurs
+         */
+        private RssFeed fetchFeed(String feedUrl) throws IOException, XmlPullParserException {
+            URL url = new URL(feedUrl);
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+
+            try {
+                connection.setRequestMethod("GET");
+                connection.setConnectTimeout(15000);
+                connection.setReadTimeout(15000);
+                connection.setRequestProperty("User-Agent", "Dumbcast/1.0");
+
+                int responseCode = connection.getResponseCode();
+                if (responseCode != HttpURLConnection.HTTP_OK) {
+                    throw new IOException("HTTP error code: " + responseCode);
+                }
+
+                InputStream inputStream = connection.getInputStream();
+                RssParser parser = new RssParser();
+                return parser.parse(inputStream);
+            } finally {
+                connection.disconnect();
+            }
+        }
+    }
+
+    /**
+     * Custom adapter for displaying search results.
+     */
+    private static class SearchResultAdapter extends ArrayAdapter<PodcastIndexApi.SearchResult> {
+
+        SearchResultAdapter(android.content.Context context,
+                           List<PodcastIndexApi.SearchResult> results) {
+            super(context, 0, results);
+        }
+
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            if (convertView == null) {
+                convertView = LayoutInflater.from(getContext())
+                    .inflate(R.layout.search_result_item, parent, false);
+            }
+
+            PodcastIndexApi.SearchResult result = getItem(position);
+            if (result != null) {
+                TextView titleView = convertView.findViewById(R.id.result_title);
+                TextView authorView = convertView.findViewById(R.id.result_author);
+                TextView descriptionView = convertView.findViewById(R.id.result_description);
+
+                titleView.setText(result.getTitle());
+                authorView.setText(result.getAuthor());
+
+                // Truncate description to a reasonable length
+                String description = result.getDescription();
+                if (description != null && description.length() > 100) {
+                    description = description.substring(0, 100) + "...";
+                }
+                descriptionView.setText(description);
+            }
+
+            return convertView;
+        }
+    }
+}
