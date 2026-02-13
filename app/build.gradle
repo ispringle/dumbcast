@@ -3,6 +3,7 @@ plugins {
 }
 
 android {
+    namespace 'com.ispringle.dumbcast'
     compileSdk 27
 
     defaultConfig {

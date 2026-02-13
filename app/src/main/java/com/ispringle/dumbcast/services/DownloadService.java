@@ -16,7 +16,7 @@ import android.os.Environment;
 import android.os.IBinder;
 import android.util.Log;
 
-import androidx.core.app.NotificationCompat;
+import android.support.v4.app.NotificationCompat;
 
 import com.ispringle.dumbcast.R;
 import com.ispringle.dumbcast.data.DatabaseHelper;
