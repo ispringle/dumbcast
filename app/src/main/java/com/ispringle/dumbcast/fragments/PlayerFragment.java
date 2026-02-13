@@ -686,10 +686,18 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
             return;
         }
 
+        // Parse HTML in description for proper formatting
+        CharSequence formattedDescription;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            formattedDescription = android.text.Html.fromHtml(description, android.text.Html.FROM_HTML_MODE_COMPACT);
+        } else {
+            formattedDescription = android.text.Html.fromHtml(description);
+        }
+
         // Show description in scrollable dialog
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         builder.setTitle(R.string.player_show_notes_title);
-        builder.setMessage(description);
+        builder.setMessage(formattedDescription);
         builder.setPositiveButton(R.string.dialog_close, null);
         builder.show();
     }

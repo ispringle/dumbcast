@@ -594,12 +594,26 @@ public class DiscoveryFragment extends Fragment {
                 titleView.setText(result.getTitle());
                 authorView.setText(result.getAuthor());
 
-                // Truncate description to a reasonable length
+                // Parse HTML and truncate description to a reasonable length
                 String description = result.getDescription();
-                if (description != null && description.length() > 100) {
-                    description = description.substring(0, 100) + "...";
+                if (description != null) {
+                    // Parse HTML for proper formatting
+                    CharSequence formattedDescription;
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                        formattedDescription = android.text.Html.fromHtml(description, android.text.Html.FROM_HTML_MODE_COMPACT);
+                    } else {
+                        formattedDescription = android.text.Html.fromHtml(description);
+                    }
+
+                    // Truncate if needed
+                    if (formattedDescription.length() > 100) {
+                        descriptionView.setText(formattedDescription.subSequence(0, 100) + "...");
+                    } else {
+                        descriptionView.setText(formattedDescription);
+                    }
+                } else {
+                    descriptionView.setText("");
                 }
-                descriptionView.setText(description);
             }
 
             return convertView;

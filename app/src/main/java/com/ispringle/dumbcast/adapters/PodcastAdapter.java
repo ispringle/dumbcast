@@ -59,13 +59,23 @@ public class PodcastAdapter extends ArrayAdapter<Podcast> {
             // Set title
             holder.titleText.setText(podcast.getTitle());
 
-            // Set description (truncated to 100 characters for list view)
+            // Set description (parse HTML and truncate to 100 characters for list view)
             String description = podcast.getDescription();
             if (description != null && !description.isEmpty()) {
-                if (description.length() > 100) {
-                    description = description.substring(0, 97) + "...";
+                // Parse HTML for proper formatting
+                CharSequence formattedDescription;
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                    formattedDescription = android.text.Html.fromHtml(description, android.text.Html.FROM_HTML_MODE_COMPACT);
+                } else {
+                    formattedDescription = android.text.Html.fromHtml(description);
                 }
-                holder.descriptionText.setText(description);
+
+                // Truncate if needed
+                if (formattedDescription.length() > 100) {
+                    holder.descriptionText.setText(formattedDescription.subSequence(0, 97) + "...");
+                } else {
+                    holder.descriptionText.setText(formattedDescription);
+                }
                 holder.descriptionText.setVisibility(View.VISIBLE);
             } else {
                 holder.descriptionText.setVisibility(View.GONE);
