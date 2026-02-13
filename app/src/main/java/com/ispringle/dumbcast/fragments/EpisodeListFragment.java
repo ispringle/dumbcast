@@ -1,11 +1,14 @@
 package com.ispringle.dumbcast.fragments;
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentTransaction;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -13,6 +16,8 @@ import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import java.io.File;
 
 import com.ispringle.dumbcast.R;
 import com.ispringle.dumbcast.adapters.EpisodeAdapter;
@@ -90,6 +95,21 @@ public class EpisodeListFragment extends Fragment {
         return fragment;
     }
 
+    /**
+     * Create a new instance to show episodes for a specific podcast AND state.
+     * @param podcastId The podcast ID
+     * @param state The episode state
+     * @return Fragment instance
+     */
+    public static EpisodeListFragment newInstanceForPodcastAndState(long podcastId, EpisodeState state) {
+        EpisodeListFragment fragment = new EpisodeListFragment();
+        Bundle args = new Bundle();
+        args.putLong(ARG_PODCAST_ID, podcastId);
+        args.putString(ARG_EPISODE_STATE, state.name());
+        fragment.setArguments(args);
+        return fragment;
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -100,6 +120,8 @@ public class EpisodeListFragment extends Fragment {
                 episodeState = EpisodeState.fromString(stateStr);
             }
         }
+
+        Log.d(TAG, "onCreate - podcastId: " + podcastId + ", episodeState: " + episodeState);
 
         // Initialize repositories using singleton DatabaseHelper
         DatabaseHelper dbHelper = DatabaseManager.getInstance(getContext());
@@ -142,6 +164,39 @@ public class EpisodeListFragment extends Fragment {
                     handleEpisodeLongClick(episode);
                 }
                 return true;
+            }
+        });
+
+        // Add key listener for D-pad navigation
+        listView.setOnKeyListener(new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                Log.d(TAG, "Key event: keyCode=" + keyCode + ", action=" + event.getAction());
+                if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        int position = listView.getSelectedItemPosition();
+                        Log.d(TAG, "Selected position: " + position);
+                        if (position >= 0) {
+                            Episode episode = adapter.getItem(position);
+                            if (episode != null) {
+                                handleEpisodeClick(episode);
+                                return true;
+                            }
+                        }
+                    }
+                } else if (keyCode == KeyEvent.KEYCODE_MENU) {
+                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        int position = listView.getSelectedItemPosition();
+                        if (position >= 0) {
+                            Episode episode = adapter.getItem(position);
+                            if (episode != null) {
+                                showContextMenu(episode);
+                                return true;
+                            }
+                        }
+                    }
+                }
+                return false;
             }
         });
 
@@ -226,7 +281,7 @@ public class EpisodeListFragment extends Fragment {
         } else {
             // Start download
             DownloadService.startDownload(getContext(), episode.getId());
-            Toast.makeText(getContext(), "Download started", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), R.string.toast_download_started, Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -235,31 +290,20 @@ public class EpisodeListFragment extends Fragment {
      * This starts the service, loads the episode, and switches to the player view.
      */
     private void startPlaybackAndNavigate(final Episode episode) {
-        // Start the playback service
-        Intent serviceIntent = new Intent(getContext(), PlaybackService.class);
-        getContext().startService(serviceIntent);
+        // Load the episode into the playback service
+        Intent loadIntent = new Intent(getContext(), PlaybackService.class);
+        loadIntent.setAction(PlaybackService.ACTION_LOAD_EPISODE);
+        loadIntent.putExtra(PlaybackService.EXTRA_EPISODE_ID, episode.getId());
+        getContext().startService(loadIntent);
 
-        // Give the service a moment to start, then navigate
-        // In a real implementation, we'd use a callback or binding, but this works for now
-        new android.os.Handler().postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                // Navigate to PlayerFragment
-                PlayerFragment playerFragment = PlayerFragment.newInstance();
+        // Navigate to PlayerFragment immediately
+        PlayerFragment playerFragment = PlayerFragment.newInstance();
+        FragmentTransaction transaction = getActivity().getSupportFragmentManager().beginTransaction();
+        transaction.replace(R.id.fragment_container, playerFragment);
+        transaction.addToBackStack(null);
+        transaction.commit();
 
-                // Load the episode into the playback service
-                Intent loadIntent = new Intent(getContext(), PlaybackService.class);
-                loadIntent.setAction(PlaybackService.ACTION_LOAD_EPISODE);
-                loadIntent.putExtra(PlaybackService.EXTRA_EPISODE_ID, episode.getId());
-                getContext().startService(loadIntent);
-
-                // Navigate to player
-                FragmentTransaction transaction = getActivity().getSupportFragmentManager().beginTransaction();
-                transaction.replace(R.id.fragment_container, playerFragment);
-                transaction.addToBackStack(null);
-                transaction.commit();
-            }
-        }, 100);
+        Log.d(TAG, "Navigating to player for episode: " + episode.getTitle());
     }
 
     /**
@@ -270,17 +314,164 @@ public class EpisodeListFragment extends Fragment {
         EpisodeState currentState = episode.getState();
 
         if (currentState == EpisodeState.BACKLOG) {
-            Toast.makeText(getContext(), "Already in backlog", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), R.string.toast_already_in_backlog, Toast.LENGTH_SHORT).show();
             return;
         }
 
         if (currentState == EpisodeState.LISTENED) {
-            Toast.makeText(getContext(), "Cannot save listened episodes to backlog", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), R.string.toast_cannot_save_listened, Toast.LENGTH_SHORT).show();
             return;
         }
 
         // Save to backlog on background thread
         new SaveToBacklogTask(this, episodeRepository, episode).execute();
+    }
+
+    /**
+     * Show context menu for an episode with conditional options based on episode state.
+     * @param episode The episode to show options for
+     */
+    private void showContextMenu(final Episode episode) {
+        if (episode == null) {
+            return;
+        }
+
+        if (getContext() == null) {
+            return;
+        }
+
+        // Build menu items conditionally
+        final List<String> menuItems = new ArrayList<>();
+
+        // If downloaded: show Delete Download and Play
+        if (episode.isDownloaded()) {
+            menuItems.add(getString(R.string.menu_delete_download));
+            menuItems.add(getString(R.string.menu_play));
+        } else {
+            // If not downloaded: show Download
+            menuItems.add(getString(R.string.menu_download));
+        }
+
+        // Always show Add to Backlog
+        menuItems.add(getString(R.string.menu_add_to_backlog));
+
+        // If NEW state: show Remove NEW
+        if (episode.getState() == EpisodeState.NEW) {
+            menuItems.add(getString(R.string.menu_remove_new_episode));
+        }
+
+        // Convert to array
+        final String[] menuArray = menuItems.toArray(new String[0]);
+
+        // Show AlertDialog
+        new AlertDialog.Builder(getContext())
+                .setTitle(episode.getTitle())
+                .setItems(menuArray, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        handleContextMenuAction(episode, which);
+                    }
+                })
+                .show();
+    }
+
+    /**
+     * Handle context menu action selection.
+     * Menu indices depend on episode state:
+     * - If downloaded: 0=Delete Download, 1=Play, 2=Add to Backlog, 3=Remove NEW (if NEW)
+     * - If not downloaded: 0=Download, 1=Add to Backlog, 2=Remove NEW (if NEW)
+     *
+     * @param episode The episode to act on
+     * @param actionIndex The selected menu item index
+     */
+    private void handleContextMenuAction(Episode episode, int actionIndex) {
+        if (episode.isDownloaded()) {
+            // Downloaded menu: Delete Download, Play, Add to Backlog, [Remove NEW]
+            switch (actionIndex) {
+                case 0: // Delete Download
+                    deleteDownload(episode);
+                    break;
+                case 1: // Play
+                    handleEpisodeClick(episode);
+                    break;
+                case 2: // Add to Backlog
+                    addToBacklog(episode);
+                    break;
+                case 3: // Remove NEW (only if NEW state)
+                    removeNew(episode);
+                    break;
+            }
+        } else {
+            // Not downloaded menu: Download, Add to Backlog, [Remove NEW]
+            switch (actionIndex) {
+                case 0: // Download
+                    downloadEpisode(episode);
+                    break;
+                case 1: // Add to Backlog
+                    addToBacklog(episode);
+                    break;
+                case 2: // Remove NEW (only if NEW state)
+                    removeNew(episode);
+                    break;
+            }
+        }
+    }
+
+    /**
+     * Start download for an episode.
+     * @param episode The episode to download
+     */
+    private void downloadEpisode(Episode episode) {
+        DownloadService.startDownload(getContext(), episode.getId());
+        Toast.makeText(getContext(), R.string.toast_download_started, Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * Delete downloaded file for an episode.
+     * Shows confirmation dialog before deleting.
+     * @param episode The episode to delete download for
+     */
+    private void deleteDownload(final Episode episode) {
+        String message = getString(R.string.dialog_delete_download_message, episode.getTitle());
+        new AlertDialog.Builder(getContext())
+                .setTitle(R.string.dialog_delete_download_title)
+                .setMessage(message)
+                .setPositiveButton(R.string.dialog_delete, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        new DeleteDownloadTask(EpisodeListFragment.this, episodeRepository, episode).execute();
+                    }
+                })
+                .setNegativeButton(R.string.dialog_cancel, null)
+                .show();
+    }
+
+    /**
+     * Add episode to backlog.
+     * @param episode The episode to add to backlog
+     */
+    private void addToBacklog(Episode episode) {
+        EpisodeState currentState = episode.getState();
+
+        if (currentState == EpisodeState.BACKLOG) {
+            Toast.makeText(getContext(), R.string.toast_already_in_backlog, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (currentState == EpisodeState.LISTENED) {
+            Toast.makeText(getContext(), R.string.toast_cannot_save_listened, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        new SaveToBacklogTask(this, episodeRepository, episode).execute();
+    }
+
+    /**
+     * Remove NEW state from episode.
+     * @param episode The episode to mark as viewed
+     */
+    private void removeNew(Episode episode) {
+        new RemoveNewTask(this, episodeRepository, episode).execute();
     }
 
     /**
@@ -301,15 +492,25 @@ public class EpisodeListFragment extends Fragment {
         protected EpisodeData doInBackground(Void... voids) {
             EpisodeListFragment fragment = fragmentRef.get();
             if (fragment == null) {
+                Log.w(TAG, "LoadEpisodesTask - fragment is null");
                 return new EpisodeData(new ArrayList<Episode>(), new HashMap<Long, Podcast>());
             }
 
+            Log.d(TAG, "LoadEpisodesTask - loading episodes for podcastId: " + fragment.podcastId + ", state: " + fragment.episodeState);
+
             List<Episode> episodes;
-            if (fragment.podcastId != -1) {
-                // Load episodes by podcast ID
+            if (fragment.podcastId != -1 && fragment.episodeState != null) {
+                // Load episodes by both podcast ID AND state
+                Log.d(TAG, "LoadEpisodesTask - calling getEpisodesByPodcastAndState(" + fragment.podcastId + ", " + fragment.episodeState + ")");
+                episodes = episodeRepository.getEpisodesByPodcastAndState(fragment.podcastId, fragment.episodeState);
+                Log.d(TAG, "LoadEpisodesTask - loaded " + episodes.size() + " episodes");
+            } else if (fragment.podcastId != -1) {
+                // Load episodes by podcast ID only
+                Log.d(TAG, "LoadEpisodesTask - calling getEpisodesByPodcast(" + fragment.podcastId + ")");
                 episodes = episodeRepository.getEpisodesByPodcast(fragment.podcastId);
+                Log.d(TAG, "LoadEpisodesTask - loaded " + episodes.size() + " episodes");
             } else if (fragment.episodeState != null) {
-                // Load episodes by state
+                // Load episodes by state only
                 episodes = episodeRepository.getEpisodesByState(fragment.episodeState);
             } else {
                 // No filter specified
@@ -393,11 +594,93 @@ public class EpisodeListFragment extends Fragment {
             EpisodeListFragment fragment = fragmentRef.get();
             if (fragment != null && fragment.getContext() != null) {
                 if (rowsUpdated > 0) {
-                    Toast.makeText(fragment.getContext(), "Saved to backlog", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(fragment.getContext(), R.string.toast_saved_to_backlog, Toast.LENGTH_SHORT).show();
                     // Refresh the list
                     fragment.loadEpisodes();
                 } else {
-                    Toast.makeText(fragment.getContext(), "Failed to save to backlog", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(fragment.getContext(), R.string.toast_failed_save_backlog, Toast.LENGTH_SHORT).show();
+                }
+            }
+        }
+    }
+
+    /**
+     * AsyncTask to delete downloaded episode file on a background thread.
+     */
+    private static class DeleteDownloadTask extends AsyncTask<Void, Void, Boolean> {
+        private final WeakReference<EpisodeListFragment> fragmentRef;
+        private final EpisodeRepository repository;
+        private final Episode episode;
+
+        DeleteDownloadTask(EpisodeListFragment fragment, EpisodeRepository repository, Episode episode) {
+            this.fragmentRef = new WeakReference<>(fragment);
+            this.repository = repository;
+            this.episode = episode;
+        }
+
+        @Override
+        protected Boolean doInBackground(Void... voids) {
+            // Delete the file
+            String downloadPath = episode.getDownloadPath();
+            if (downloadPath != null) {
+                File file = new File(downloadPath);
+                if (file.exists()) {
+                    if (!file.delete()) {
+                        Log.e(TAG, "Failed to delete file: " + downloadPath);
+                        return false;
+                    }
+                }
+            }
+
+            // Update database to clear download info
+            int rowsUpdated = repository.updateEpisodeDownload(episode.getId(), null, 0);
+            return rowsUpdated > 0;
+        }
+
+        @Override
+        protected void onPostExecute(Boolean success) {
+            EpisodeListFragment fragment = fragmentRef.get();
+            if (fragment != null && fragment.getContext() != null) {
+                if (success) {
+                    Toast.makeText(fragment.getContext(), R.string.toast_download_deleted, Toast.LENGTH_SHORT).show();
+                    // Refresh the list
+                    fragment.loadEpisodes();
+                } else {
+                    Toast.makeText(fragment.getContext(), R.string.toast_failed_delete_download, Toast.LENGTH_SHORT).show();
+                }
+            }
+        }
+    }
+
+    /**
+     * AsyncTask to remove NEW state from episode on a background thread.
+     */
+    private static class RemoveNewTask extends AsyncTask<Void, Void, Integer> {
+        private final WeakReference<EpisodeListFragment> fragmentRef;
+        private final EpisodeRepository repository;
+        private final Episode episode;
+
+        RemoveNewTask(EpisodeListFragment fragment, EpisodeRepository repository, Episode episode) {
+            this.fragmentRef = new WeakReference<>(fragment);
+            this.repository = repository;
+            this.episode = episode;
+        }
+
+        @Override
+        protected Integer doInBackground(Void... voids) {
+            return repository.updateEpisodeState(episode.getId(), EpisodeState.AVAILABLE);
+        }
+
+        @Override
+        protected void onPostExecute(Integer rowsUpdated) {
+            EpisodeListFragment fragment = fragmentRef.get();
+            if (fragment != null && fragment.getContext() != null) {
+                if (rowsUpdated > 0) {
+                    Toast.makeText(fragment.getContext(), R.string.toast_marked_viewed, Toast.LENGTH_SHORT).show();
+                    // Refresh the list
+                    fragment.loadEpisodes();
+                } else {
+                    Toast.makeText(fragment.getContext(), R.string.toast_failed_update_episode, Toast.LENGTH_SHORT).show();
                 }
             }
         }
