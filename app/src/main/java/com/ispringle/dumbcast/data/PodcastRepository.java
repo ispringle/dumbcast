@@ -341,12 +341,20 @@ public class PodcastRepository {
         long now = System.currentTimeMillis();
         int newEpisodeCount = 0;
         int skippedCount = 0;
+        int consecutiveDuplicates = 0;
+        final int DUPLICATE_THRESHOLD = 10; // Stop after 10 consecutive duplicates
 
         Log.d(TAG, "Processing " + feed.getItems().size() + " items from feed for podcast ID: " + podcastId);
 
         db.beginTransaction();
         try {
             for (RssFeed.RssItem item : feed.getItems()) {
+                // Stop processing if we've hit too many consecutive duplicates
+                // This prevents re-processing thousands of old episodes on refresh
+                if (consecutiveDuplicates >= DUPLICATE_THRESHOLD) {
+                    Log.d(TAG, "Stopping early: encountered " + DUPLICATE_THRESHOLD + " consecutive duplicates (total processed: " + (newEpisodeCount + skippedCount) + ")");
+                    break;
+                }
                 // Only require title - GUID and enclosureUrl are now optional
                 if (item.getTitle() == null || item.getTitle().trim().isEmpty()) {
                     Log.w(TAG, "Skipping item without title");
@@ -376,8 +384,12 @@ public class PodcastRepository {
                 if (episodeExists(podcastId, guid)) {
                     Log.d(TAG, "Episode already exists, skipping: " + item.getTitle());
                     skippedCount++;
+                    consecutiveDuplicates++;
                     continue;
                 }
+
+                // Reset consecutive duplicate counter when we find a new episode
+                consecutiveDuplicates = 0;
 
                 // Create new episode with potentially generated GUID
                 Episode episode = new Episode(

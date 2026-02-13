@@ -60,9 +60,15 @@ public class RssParser {
     private void readChannel(XmlPullParser parser, RssFeed feed)
             throws XmlPullParserException, IOException {
         parser.require(XmlPullParser.START_TAG, ns, "channel");
+        int itemCount = 0;
+        final int MAX_ITEMS = 500; // Safety limit to prevent runaway parsing
 
-        while (parser.next() != XmlPullParser.END_TAG) {
-            if (parser.getEventType() != XmlPullParser.START_TAG) {
+        android.util.Log.d("RssParser", "Starting readChannel loop");
+        // Read until we hit the closing </channel> tag specifically
+        while (parser.next() != XmlPullParser.END_TAG || !parser.getName().equals("channel")) {
+            int eventType = parser.getEventType();
+
+            if (eventType != XmlPullParser.START_TAG) {
                 continue;
             }
             String name = parser.getName();
@@ -81,13 +87,24 @@ public class RssParser {
                     readImage(parser, feed);
                     break;
                 case "item":
+                    itemCount++;
+                    android.util.Log.d("RssParser", "Reading item #" + itemCount);
+
+                    // Safety check to prevent runaway parsing
+                    if (itemCount > MAX_ITEMS) {
+                        android.util.Log.w("RssParser", "Reached max item limit (" + MAX_ITEMS + "), stopping parse");
+                        return; // Exit early but successfully
+                    }
+
                     feed.addItem(readItem(parser));
+                    android.util.Log.d("RssParser", "Finished reading item #" + itemCount);
                     break;
                 default:
                     skip(parser);
                     break;
             }
         }
+        android.util.Log.d("RssParser", "Finished reading channel. Total items: " + itemCount);
     }
 
     private RssFeed.RssItem readItem(XmlPullParser parser)
@@ -95,7 +112,8 @@ public class RssParser {
         parser.require(XmlPullParser.START_TAG, ns, "item");
         RssFeed.RssItem item = new RssFeed.RssItem();
 
-        while (parser.next() != XmlPullParser.END_TAG) {
+        // Read until we hit the closing </item> tag specifically
+        while (parser.next() != XmlPullParser.END_TAG || !parser.getName().equals("item")) {
             if (parser.getEventType() != XmlPullParser.START_TAG) {
                 continue;
             }
@@ -200,8 +218,11 @@ public class RssParser {
                 eventType = parser.next();
             } else if (eventType == XmlPullParser.START_TAG) {
                 // Skip nested HTML tags (e.g., <p>, <br>, etc.)
+                String nestedTag = parser.getName();
+                android.util.Log.d("RssParser", "Skipping nested HTML tag in " + tagName + ": <" + nestedTag + ">");
                 skip(parser);
                 eventType = parser.getEventType();
+                android.util.Log.d("RssParser", "After skip, eventType=" + eventType + ", name=" + parser.getName());
             } else {
                 eventType = parser.next();
             }

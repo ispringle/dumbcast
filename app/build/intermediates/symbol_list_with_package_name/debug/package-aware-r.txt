@@ -848,7 +848,6 @@ id player_chapter_name
 id player_elapsed_time
 id player_episode_title
 id player_play_pause
-id player_podcast_name
 id player_progress_bar
 id player_progress_text
 id player_status_message
@@ -1139,11 +1138,14 @@ string toast_marked_viewed
 string toast_no_new_episodes
 string toast_refresh
 string toast_refresh_all
+string toast_refresh_all_complete
+string toast_refresh_all_progress
 string toast_refresh_error
 string toast_refresh_network_error
 string toast_refresh_no_new
 string toast_refresh_parse_error
 string toast_refresh_success
+string toast_refreshing_all
 string toast_refreshing_podcast
 string toast_remove_new
 string toast_saved_to_backlog
