@@ -22,8 +22,12 @@ import com.ispringle.dumbcast.MainActivity;
 import com.ispringle.dumbcast.R;
 import com.ispringle.dumbcast.data.DatabaseHelper;
 import com.ispringle.dumbcast.data.Episode;
+import com.ispringle.dumbcast.data.EpisodeRepository;
+import com.ispringle.dumbcast.data.EpisodeState;
 
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Background service for audio playback with MediaPlayer integration.
@@ -54,6 +58,7 @@ public class PlaybackService extends Service {
     private MediaPlayer mediaPlayer;
     private PowerManager.WakeLock wakeLock;
     private DatabaseHelper dbHelper;
+    private EpisodeRepository episodeRepo;
     private Episode currentEpisode;
     private PlaybackListener listener;
     private final IBinder binder = new PlaybackBinder();
@@ -65,6 +70,9 @@ public class PlaybackService extends Service {
 
     // Playback state
     private boolean isPlaying = false;
+
+    // Background thread for database operations
+    private ExecutorService dbExecutor;
 
     /**
      * Interface for playback state callbacks
@@ -93,6 +101,10 @@ public class PlaybackService extends Service {
         Log.d(TAG, "Service created");
 
         dbHelper = new DatabaseHelper(this);
+        episodeRepo = new EpisodeRepository(dbHelper);
+
+        // Initialize background executor for database operations
+        dbExecutor = Executors.newSingleThreadExecutor();
 
         // Initialize MediaPlayer
         mediaPlayer = new MediaPlayer();
@@ -189,6 +201,11 @@ public class PlaybackService extends Service {
         // Release wakelock
         if (wakeLock != null && wakeLock.isHeld()) {
             wakeLock.release();
+        }
+
+        // Shutdown background executor
+        if (dbExecutor != null) {
+            dbExecutor.shutdown();
         }
 
         super.onDestroy();
@@ -501,13 +518,24 @@ public class PlaybackService extends Service {
         // Stop position tracking
         positionHandler.removeCallbacks(positionRunnable);
 
-        // Save final position (at end)
+        // Save final position and update state
         if (currentEpisode != null) {
             int duration = getDuration();
+            int currentPosition = getCurrentPosition();
             savePlaybackPosition(duration);
 
-            // Mark episode as played
-            updatePlayedAt();
+            // Check if episode was played >90% - mark as LISTENED
+            if (duration > 0) {
+                double percentPlayed = (double) currentPosition / duration;
+                if (percentPlayed >= 0.9) {
+                    markAsListened();
+                    Log.d(TAG, "Episode marked as LISTENED (played " +
+                        String.format("%.1f%%", percentPlayed * 100) + ")");
+                } else {
+                    // Still update played_at timestamp even if not fully listened
+                    updatePlayedAt();
+                }
+            }
 
             // Notify listener
             if (listener != null) {
@@ -547,31 +575,70 @@ public class PlaybackService extends Service {
 
     /**
      * Save playback position to database
+     * Uses background thread to avoid blocking playback
      */
     private void savePlaybackPosition(int positionSeconds) {
         if (currentEpisode == null) {
             return;
         }
 
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        ContentValues values = new ContentValues();
-        values.put(DatabaseHelper.COL_EPISODE_PLAYBACK_POS, positionSeconds);
+        final long episodeId = currentEpisode.getId();
+        final int position = positionSeconds;
 
-        db.update(
-            DatabaseHelper.TABLE_EPISODES,
-            values,
-            DatabaseHelper.COL_EPISODE_ID + " = ?",
-            new String[]{String.valueOf(currentEpisode.getId())}
-        );
-
-        // Update in-memory episode
+        // Update in-memory episode immediately
         currentEpisode.setPlaybackPosition(positionSeconds);
 
-        Log.d(TAG, "Saved position: " + positionSeconds + "s");
+        // Save to database on background thread
+        if (dbExecutor != null && !dbExecutor.isShutdown()) {
+            dbExecutor.execute(() -> {
+                try {
+                    int rowsAffected = episodeRepo.updateEpisodePlaybackPosition(episodeId, position);
+                    if (rowsAffected > 0) {
+                        Log.d(TAG, "Saved position: " + position + "s for episode ID: " + episodeId);
+                    } else {
+                        Log.w(TAG, "Failed to save position - episode may have been deleted: " + episodeId);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error saving playback position to database", e);
+                }
+            });
+        }
     }
 
     /**
-     * Update played_at timestamp
+     * Mark episode as LISTENED using the repository
+     * This sets the state to LISTENED and updates played_at timestamp
+     */
+    private void markAsListened() {
+        if (currentEpisode == null) {
+            return;
+        }
+
+        final long episodeId = currentEpisode.getId();
+
+        // Update in-memory episode
+        currentEpisode.setState(EpisodeState.LISTENED);
+        currentEpisode.setPlayedAt(System.currentTimeMillis());
+
+        // Update database on background thread
+        if (dbExecutor != null && !dbExecutor.isShutdown()) {
+            dbExecutor.execute(() -> {
+                try {
+                    int rowsAffected = episodeRepo.updateEpisodeState(episodeId, EpisodeState.LISTENED);
+                    if (rowsAffected > 0) {
+                        Log.d(TAG, "Episode marked as LISTENED in database: " + episodeId);
+                    } else {
+                        Log.w(TAG, "Failed to mark as LISTENED - episode may have been deleted: " + episodeId);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error marking episode as LISTENED in database", e);
+                }
+            });
+        }
+    }
+
+    /**
+     * Update played_at timestamp (for partial playback)
      */
     private void updatePlayedAt() {
         if (currentEpisode == null) {

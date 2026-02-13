@@ -140,6 +140,26 @@ public class EpisodeRepository {
     }
 
     /**
+     * Update the playback position for an episode.
+     * This is called frequently during playback, so it only updates the position column.
+     * @param id The episode ID
+     * @param positionSeconds The playback position in seconds
+     * @return The number of rows affected
+     */
+    public int updateEpisodePlaybackPosition(long id, int positionSeconds) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(DatabaseHelper.COL_EPISODE_PLAYBACK_POS, positionSeconds);
+
+        return db.update(
+            DatabaseHelper.TABLE_EPISODES,
+            values,
+            DatabaseHelper.COL_EPISODE_ID + " = ?",
+            new String[]{String.valueOf(id)}
+        );
+    }
+
+    /**
      * Get all episodes with a specific state.
      * @param state The episode state to filter by
      * @return List of episodes in the specified state
