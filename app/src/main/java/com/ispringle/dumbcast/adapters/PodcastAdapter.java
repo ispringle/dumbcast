@@ -8,10 +8,11 @@ import android.widget.ArrayAdapter;
 import android.widget.TextView;
 
 import com.ispringle.dumbcast.R;
-import com.ispringle.dumbcast.data.EpisodeRepository;
 import com.ispringle.dumbcast.data.Podcast;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Custom ArrayAdapter for displaying Podcast objects in a ListView.
@@ -21,7 +22,7 @@ import java.util.List;
 public class PodcastAdapter extends ArrayAdapter<Podcast> {
 
     private final LayoutInflater inflater;
-    private final EpisodeRepository episodeRepository;
+    private final Map<Long, Integer> episodeCounts;
 
     /**
      * ViewHolder pattern to cache view references for performance.
@@ -32,10 +33,10 @@ public class PodcastAdapter extends ArrayAdapter<Podcast> {
         TextView episodeCountText;
     }
 
-    public PodcastAdapter(Context context, List<Podcast> podcasts, EpisodeRepository episodeRepository) {
+    public PodcastAdapter(Context context, List<Podcast> podcasts, Map<Long, Integer> episodeCounts) {
         super(context, 0, podcasts);
         this.inflater = LayoutInflater.from(context);
-        this.episodeRepository = episodeRepository;
+        this.episodeCounts = episodeCounts != null ? episodeCounts : new HashMap<Long, Integer>();
     }
 
     @Override
@@ -70,9 +71,13 @@ public class PodcastAdapter extends ArrayAdapter<Podcast> {
                 holder.descriptionText.setVisibility(View.GONE);
             }
 
-            // Get and display episode count
-            int episodeCount = episodeRepository.getEpisodeCountByPodcast(podcast.getId());
-            holder.episodeCountText.setText(episodeCount + " eps");
+            // Get and display episode count from cached map
+            Integer episodeCount = episodeCounts.get(podcast.getId());
+            if (episodeCount != null) {
+                holder.episodeCountText.setText(episodeCount + " eps");
+            } else {
+                holder.episodeCountText.setText("0 eps");
+            }
         }
 
         return convertView;

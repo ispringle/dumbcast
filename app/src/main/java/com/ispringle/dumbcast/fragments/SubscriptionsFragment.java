@@ -21,7 +21,9 @@ import com.ispringle.dumbcast.data.PodcastRepository;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Fragment displaying the user's podcast subscriptions.
@@ -65,8 +67,8 @@ public class SubscriptionsFragment extends Fragment {
         // Add empty state text (reusing the title TextView for now)
         emptyText = view.findViewById(R.id.subscriptions_title);
 
-        // Initialize adapter with empty list
-        adapter = new PodcastAdapter(getContext(), new ArrayList<Podcast>(), episodeRepository);
+        // Initialize adapter with empty list and empty count map
+        adapter = new PodcastAdapter(getContext(), new ArrayList<Podcast>(), new HashMap<Long, Integer>());
         listView.setAdapter(adapter);
 
         // Set up click listener to navigate to episode list
@@ -91,29 +93,41 @@ public class SubscriptionsFragment extends Fragment {
     }
 
     /**
-     * Load podcasts from database on a background thread.
+     * Load podcasts and episode counts from database on a background thread.
      */
     private void loadPodcasts() {
-        new LoadPodcastsTask(this, podcastRepository).execute();
+        new LoadPodcastsTask(this, podcastRepository, episodeRepository).execute();
+    }
+
+    /**
+     * Data class to hold podcasts and their episode counts.
+     */
+    private static class PodcastData {
+        List<Podcast> podcasts;
+        Map<Long, Integer> episodeCounts;
+
+        PodcastData(List<Podcast> podcasts, Map<Long, Integer> episodeCounts) {
+            this.podcasts = podcasts;
+            this.episodeCounts = episodeCounts;
+        }
     }
 
     /**
      * Update the UI with loaded podcasts (called on main thread).
-     * @param podcasts List of podcasts to display
+     * @param data Podcasts and their episode counts
      */
-    private void updatePodcastList(List<Podcast> podcasts) {
-        adapter.clear();
-        adapter.addAll(podcasts);
-        adapter.notifyDataSetChanged();
+    private void updatePodcastList(PodcastData data) {
+        adapter = new PodcastAdapter(getContext(), data.podcasts, data.episodeCounts);
+        listView.setAdapter(adapter);
 
         // Show message if no podcasts
-        if (podcasts.isEmpty()) {
+        if (data.podcasts.isEmpty()) {
             emptyText.setText("No subscriptions yet");
         } else {
             emptyText.setText(R.string.subscriptions_title);
         }
 
-        Log.d(TAG, "Loaded " + podcasts.size() + " podcasts");
+        Log.d(TAG, "Loaded " + data.podcasts.size() + " podcasts");
     }
 
     /**
@@ -132,27 +146,38 @@ public class SubscriptionsFragment extends Fragment {
     }
 
     /**
-     * AsyncTask to load podcasts from database on a background thread.
+     * AsyncTask to load podcasts and episode counts from database on a background thread.
      */
-    private static class LoadPodcastsTask extends AsyncTask<Void, Void, List<Podcast>> {
+    private static class LoadPodcastsTask extends AsyncTask<Void, Void, PodcastData> {
         private final WeakReference<SubscriptionsFragment> fragmentRef;
-        private final PodcastRepository repository;
+        private final PodcastRepository podcastRepository;
+        private final EpisodeRepository episodeRepository;
 
-        LoadPodcastsTask(SubscriptionsFragment fragment, PodcastRepository repository) {
+        LoadPodcastsTask(SubscriptionsFragment fragment, PodcastRepository podcastRepository, EpisodeRepository episodeRepository) {
             this.fragmentRef = new WeakReference<>(fragment);
-            this.repository = repository;
+            this.podcastRepository = podcastRepository;
+            this.episodeRepository = episodeRepository;
         }
 
         @Override
-        protected List<Podcast> doInBackground(Void... voids) {
-            return repository.getAllPodcasts();
+        protected PodcastData doInBackground(Void... voids) {
+            List<Podcast> podcasts = podcastRepository.getAllPodcasts();
+            Map<Long, Integer> episodeCounts = new HashMap<>();
+
+            // Preload episode counts for all podcasts
+            for (Podcast podcast : podcasts) {
+                int count = episodeRepository.getEpisodeCountByPodcast(podcast.getId());
+                episodeCounts.put(podcast.getId(), count);
+            }
+
+            return new PodcastData(podcasts, episodeCounts);
         }
 
         @Override
-        protected void onPostExecute(List<Podcast> podcasts) {
+        protected void onPostExecute(PodcastData data) {
             SubscriptionsFragment fragment = fragmentRef.get();
-            if (fragment != null && podcasts != null) {
-                fragment.updatePodcastList(podcasts);
+            if (fragment != null && data != null) {
+                fragment.updatePodcastList(data);
             }
         }
     }

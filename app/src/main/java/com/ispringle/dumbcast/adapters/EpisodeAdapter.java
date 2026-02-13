@@ -11,9 +11,10 @@ import com.ispringle.dumbcast.R;
 import com.ispringle.dumbcast.data.Episode;
 import com.ispringle.dumbcast.data.EpisodeState;
 import com.ispringle.dumbcast.data.Podcast;
-import com.ispringle.dumbcast.data.PodcastRepository;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Custom ArrayAdapter for displaying Episode objects in a ListView.
@@ -23,7 +24,7 @@ import java.util.List;
 public class EpisodeAdapter extends ArrayAdapter<Episode> {
 
     private final LayoutInflater inflater;
-    private final PodcastRepository podcastRepository;
+    private final Map<Long, Podcast> podcastCache;
 
     /**
      * ViewHolder pattern to cache view references for performance.
@@ -36,10 +37,10 @@ public class EpisodeAdapter extends ArrayAdapter<Episode> {
         TextView downloadStatus;
     }
 
-    public EpisodeAdapter(Context context, List<Episode> episodes, PodcastRepository podcastRepository) {
+    public EpisodeAdapter(Context context, List<Episode> episodes, Map<Long, Podcast> podcastCache) {
         super(context, 0, episodes);
         this.inflater = LayoutInflater.from(context);
-        this.podcastRepository = podcastRepository;
+        this.podcastCache = podcastCache != null ? podcastCache : new HashMap<Long, Podcast>();
     }
 
     @Override
@@ -64,8 +65,8 @@ public class EpisodeAdapter extends ArrayAdapter<Episode> {
             // Set title
             holder.titleText.setText(episode.getTitle());
 
-            // Set podcast name
-            Podcast podcast = podcastRepository.getPodcastById(episode.getPodcastId());
+            // Set podcast name from cached map
+            Podcast podcast = podcastCache.get(episode.getPodcastId());
             if (podcast != null) {
                 holder.podcastNameText.setText(podcast.getTitle());
             } else {

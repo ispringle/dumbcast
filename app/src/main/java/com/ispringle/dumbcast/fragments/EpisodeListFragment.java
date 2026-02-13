@@ -26,7 +26,9 @@ import com.ispringle.dumbcast.services.PlaybackService;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Fragment displaying a list of episodes for a specific podcast or episode state.
@@ -115,8 +117,8 @@ public class EpisodeListFragment extends Fragment {
         // Set title based on filter type
         updateTitle();
 
-        // Initialize adapter with empty list
-        adapter = new EpisodeAdapter(getContext(), new ArrayList<Episode>(), podcastRepository);
+        // Initialize adapter with empty list and empty podcast cache
+        adapter = new EpisodeAdapter(getContext(), new ArrayList<Episode>(), new HashMap<Long, Podcast>());
         listView.setAdapter(adapter);
 
         // Set up click listeners
@@ -166,23 +168,35 @@ public class EpisodeListFragment extends Fragment {
     }
 
     /**
-     * Load episodes from database on a background thread.
+     * Load episodes and related podcasts from database on a background thread.
      */
     private void loadEpisodes() {
-        new LoadEpisodesTask(this, episodeRepository).execute();
+        new LoadEpisodesTask(this, episodeRepository, podcastRepository).execute();
+    }
+
+    /**
+     * Data class to hold episodes and their related podcast data.
+     */
+    private static class EpisodeData {
+        List<Episode> episodes;
+        Map<Long, Podcast> podcastCache;
+
+        EpisodeData(List<Episode> episodes, Map<Long, Podcast> podcastCache) {
+            this.episodes = episodes;
+            this.podcastCache = podcastCache;
+        }
     }
 
     /**
      * Update the UI with loaded episodes (called on main thread).
-     * @param episodes List of episodes to display
+     * @param data Episodes and their related podcast data
      */
-    private void updateEpisodeList(List<Episode> episodes) {
-        adapter.clear();
-        adapter.addAll(episodes);
-        adapter.notifyDataSetChanged();
+    private void updateEpisodeList(EpisodeData data) {
+        adapter = new EpisodeAdapter(getContext(), data.episodes, data.podcastCache);
+        listView.setAdapter(adapter);
 
         // Show/hide empty state
-        if (episodes.isEmpty()) {
+        if (data.episodes.isEmpty()) {
             emptyText.setVisibility(View.VISIBLE);
             listView.setVisibility(View.GONE);
         } else {
@@ -190,7 +204,7 @@ public class EpisodeListFragment extends Fragment {
             listView.setVisibility(View.VISIBLE);
         }
 
-        Log.d(TAG, "Loaded " + episodes.size() + " episodes");
+        Log.d(TAG, "Loaded " + data.episodes.size() + " episodes");
     }
 
     /**
@@ -267,41 +281,58 @@ public class EpisodeListFragment extends Fragment {
     }
 
     /**
-     * AsyncTask to load episodes from database on a background thread.
+     * AsyncTask to load episodes and related podcasts from database on a background thread.
      */
-    private static class LoadEpisodesTask extends AsyncTask<Void, Void, List<Episode>> {
+    private static class LoadEpisodesTask extends AsyncTask<Void, Void, EpisodeData> {
         private final WeakReference<EpisodeListFragment> fragmentRef;
-        private final EpisodeRepository repository;
+        private final EpisodeRepository episodeRepository;
+        private final PodcastRepository podcastRepository;
 
-        LoadEpisodesTask(EpisodeListFragment fragment, EpisodeRepository repository) {
+        LoadEpisodesTask(EpisodeListFragment fragment, EpisodeRepository episodeRepository, PodcastRepository podcastRepository) {
             this.fragmentRef = new WeakReference<>(fragment);
-            this.repository = repository;
+            this.episodeRepository = episodeRepository;
+            this.podcastRepository = podcastRepository;
         }
 
         @Override
-        protected List<Episode> doInBackground(Void... voids) {
+        protected EpisodeData doInBackground(Void... voids) {
             EpisodeListFragment fragment = fragmentRef.get();
             if (fragment == null) {
-                return new ArrayList<>();
+                return new EpisodeData(new ArrayList<Episode>(), new HashMap<Long, Podcast>());
             }
 
+            List<Episode> episodes;
             if (fragment.podcastId != -1) {
                 // Load episodes by podcast ID
-                return repository.getEpisodesByPodcast(fragment.podcastId);
+                episodes = episodeRepository.getEpisodesByPodcast(fragment.podcastId);
             } else if (fragment.episodeState != null) {
                 // Load episodes by state
-                return repository.getEpisodesByState(fragment.episodeState);
+                episodes = episodeRepository.getEpisodesByState(fragment.episodeState);
             } else {
                 // No filter specified
-                return new ArrayList<>();
+                episodes = new ArrayList<>();
             }
+
+            // Build podcast cache for all unique podcast IDs in the episode list
+            Map<Long, Podcast> podcastCache = new HashMap<>();
+            for (Episode episode : episodes) {
+                long pid = episode.getPodcastId();
+                if (!podcastCache.containsKey(pid)) {
+                    Podcast podcast = podcastRepository.getPodcastById(pid);
+                    if (podcast != null) {
+                        podcastCache.put(pid, podcast);
+                    }
+                }
+            }
+
+            return new EpisodeData(episodes, podcastCache);
         }
 
         @Override
-        protected void onPostExecute(List<Episode> episodes) {
+        protected void onPostExecute(EpisodeData data) {
             EpisodeListFragment fragment = fragmentRef.get();
-            if (fragment != null && episodes != null) {
-                fragment.updateEpisodeList(episodes);
+            if (fragment != null && data != null) {
+                fragment.updateEpisodeList(data);
             }
         }
     }
