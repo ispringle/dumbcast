@@ -20,6 +20,7 @@ import android.support.v4.app.NotificationCompat;
 
 import com.ispringle.dumbcast.R;
 import com.ispringle.dumbcast.data.DatabaseHelper;
+import com.ispringle.dumbcast.data.DatabaseManager;
 import com.ispringle.dumbcast.data.Episode;
 import com.ispringle.dumbcast.data.EpisodeRepository;
 import com.ispringle.dumbcast.data.Podcast;
@@ -54,7 +55,7 @@ public class DownloadService extends Service {
         super.onCreate();
 
         downloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-        DatabaseHelper dbHelper = new DatabaseHelper(this);
+        DatabaseHelper dbHelper = DatabaseManager.getInstance(this);
         episodeRepository = new EpisodeRepository(dbHelper);
         podcastRepository = new PodcastRepository(dbHelper);
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);

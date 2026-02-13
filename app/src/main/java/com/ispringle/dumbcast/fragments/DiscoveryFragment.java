@@ -20,6 +20,7 @@ import android.widget.Toast;
 
 import com.ispringle.dumbcast.R;
 import com.ispringle.dumbcast.data.DatabaseHelper;
+import com.ispringle.dumbcast.data.DatabaseManager;
 import com.ispringle.dumbcast.data.Podcast;
 import com.ispringle.dumbcast.data.PodcastRepository;
 import com.ispringle.dumbcast.utils.PodcastIndexApi;
@@ -63,8 +64,8 @@ public class DiscoveryFragment extends Fragment {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // Initialize repository
-        DatabaseHelper dbHelper = new DatabaseHelper(getContext());
+        // Initialize repository using singleton DatabaseHelper
+        DatabaseHelper dbHelper = DatabaseManager.getInstance(getContext());
         podcastRepository = new PodcastRepository(dbHelper);
     }
 

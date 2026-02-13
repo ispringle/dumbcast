@@ -15,6 +15,7 @@ import android.widget.TextView;
 import com.ispringle.dumbcast.R;
 import com.ispringle.dumbcast.adapters.PodcastAdapter;
 import com.ispringle.dumbcast.data.DatabaseHelper;
+import com.ispringle.dumbcast.data.DatabaseManager;
 import com.ispringle.dumbcast.data.EpisodeRepository;
 import com.ispringle.dumbcast.data.Podcast;
 import com.ispringle.dumbcast.data.PodcastRepository;
@@ -51,8 +52,8 @@ public class SubscriptionsFragment extends Fragment {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // Initialize repositories
-        DatabaseHelper dbHelper = new DatabaseHelper(getContext());
+        // Initialize repositories using singleton DatabaseHelper
+        DatabaseHelper dbHelper = DatabaseManager.getInstance(getContext());
         podcastRepository = new PodcastRepository(dbHelper);
         episodeRepository = new EpisodeRepository(dbHelper);
     }

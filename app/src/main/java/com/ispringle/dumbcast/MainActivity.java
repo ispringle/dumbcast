@@ -8,6 +8,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.view.KeyEvent;
 
 import com.ispringle.dumbcast.data.DatabaseHelper;
+import com.ispringle.dumbcast.data.DatabaseManager;
 import com.ispringle.dumbcast.data.EpisodeRepository;
 import com.ispringle.dumbcast.fragments.DiscoveryFragment;
 import com.ispringle.dumbcast.fragments.PlayerFragment;
@@ -34,12 +35,17 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Initialize database and repository
-        DatabaseHelper dbHelper = new DatabaseHelper(this);
+        // Initialize database and repository using singleton
+        DatabaseHelper dbHelper = DatabaseManager.getInstance(this);
         episodeRepository = new EpisodeRepository(dbHelper);
 
-        // Run episode decay on app startup
-        episodeRepository.decayNewEpisodes();
+        // Run episode decay on background thread to avoid blocking app startup
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                episodeRepository.decayNewEpisodes();
+            }
+        }).start();
 
         // Setup TabLayout
         tabLayout = findViewById(R.id.tab_layout);

@@ -17,6 +17,7 @@ import android.widget.Toast;
 import com.ispringle.dumbcast.R;
 import com.ispringle.dumbcast.adapters.EpisodeAdapter;
 import com.ispringle.dumbcast.data.DatabaseHelper;
+import com.ispringle.dumbcast.data.DatabaseManager;
 import com.ispringle.dumbcast.data.Episode;
 import com.ispringle.dumbcast.data.EpisodeRepository;
 import com.ispringle.dumbcast.data.EpisodeState;
@@ -99,8 +100,8 @@ public class EpisodeListFragment extends Fragment {
             }
         }
 
-        // Initialize repositories
-        DatabaseHelper dbHelper = new DatabaseHelper(getContext());
+        // Initialize repositories using singleton DatabaseHelper
+        DatabaseHelper dbHelper = DatabaseManager.getInstance(getContext());
         episodeRepository = new EpisodeRepository(dbHelper);
         podcastRepository = new PodcastRepository(dbHelper);
     }

@@ -21,6 +21,7 @@ import android.util.Log;
 import com.ispringle.dumbcast.MainActivity;
 import com.ispringle.dumbcast.R;
 import com.ispringle.dumbcast.data.DatabaseHelper;
+import com.ispringle.dumbcast.data.DatabaseManager;
 import com.ispringle.dumbcast.data.Episode;
 import com.ispringle.dumbcast.data.EpisodeRepository;
 import com.ispringle.dumbcast.data.EpisodeState;
@@ -102,7 +103,7 @@ public class PlaybackService extends Service {
         super.onCreate();
         Log.d(TAG, "Service created");
 
-        dbHelper = new DatabaseHelper(this);
+        dbHelper = DatabaseManager.getInstance(this);
         episodeRepo = new EpisodeRepository(dbHelper);
 
         // Initialize background executor for database operations

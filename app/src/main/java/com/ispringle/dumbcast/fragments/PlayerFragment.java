@@ -18,6 +18,7 @@ import android.widget.Toast;
 
 import com.ispringle.dumbcast.R;
 import com.ispringle.dumbcast.data.DatabaseHelper;
+import com.ispringle.dumbcast.data.DatabaseManager;
 import com.ispringle.dumbcast.data.Episode;
 import com.ispringle.dumbcast.data.Podcast;
 import com.ispringle.dumbcast.data.PodcastRepository;
@@ -73,8 +74,8 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Initialize repositories
-        DatabaseHelper dbHelper = new DatabaseHelper(getContext());
+        // Initialize repositories using singleton DatabaseHelper
+        DatabaseHelper dbHelper = DatabaseManager.getInstance(getContext());
         podcastRepository = new PodcastRepository(dbHelper);
     }
 
