@@ -29,6 +29,7 @@ import com.ispringle.dumbcast.data.PodcastRepository;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.HashMap;
@@ -67,7 +68,7 @@ public class DownloadService extends Service {
             downloadEpisodeMap = new HashMap<>();
 
             // Register broadcast receiver for download completion
-            downloadCompleteReceiver = new DownloadCompleteReceiver();
+            downloadCompleteReceiver = new DownloadCompleteReceiver(this);
             IntentFilter filter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
             registerReceiver(downloadCompleteReceiver, filter);
 
@@ -257,10 +258,11 @@ public class DownloadService extends Service {
 
     /**
      * Handle download completion.
+     * Package-private so DownloadCompleteReceiver can access it.
      *
      * @param downloadId The ID of the completed download
      */
-    private void handleDownloadComplete(long downloadId) {
+    void handleDownloadComplete(long downloadId) {
         // Get episode ID for this download
         Long episodeId = downloadEpisodeMap.get(downloadId);
         if (episodeId == null) {
@@ -560,8 +562,15 @@ public class DownloadService extends Service {
 
     /**
      * BroadcastReceiver for handling download completion events.
+     * Must be static because it's registered in AndroidManifest.
      */
-    public class DownloadCompleteReceiver extends BroadcastReceiver {
+    public static class DownloadCompleteReceiver extends BroadcastReceiver {
+        private final WeakReference<DownloadService> serviceRef;
+
+        public DownloadCompleteReceiver(DownloadService service) {
+            this.serviceRef = new WeakReference<>(service);
+        }
+
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
@@ -571,7 +580,10 @@ public class DownloadService extends Service {
 
                 if (downloadId != -1) {
                     Log.d(TAG, "Download complete broadcast received for ID: " + downloadId);
-                    handleDownloadComplete(downloadId);
+                    DownloadService service = serviceRef.get();
+                    if (service != null) {
+                        service.handleDownloadComplete(downloadId);
+                    }
                 }
             }
         }

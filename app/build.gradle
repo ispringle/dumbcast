@@ -30,10 +30,20 @@ android {
         buildConfigField "String", "PODCAST_INDEX_API_SECRET", "\"${localProperties.getProperty('podcastindex.apiSecret', 'YOUR_API_SECRET_HERE')}\""
     }
 
+    signingConfigs {
+        release {
+            storeFile file('dumbcast-release.keystore')
+            storePassword 'android'
+            keyAlias 'dumbcast'
+            keyPassword 'android'
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
         debug {
             minifyEnabled false
