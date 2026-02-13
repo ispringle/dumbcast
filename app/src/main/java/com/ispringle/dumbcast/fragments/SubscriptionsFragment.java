@@ -1,16 +1,22 @@
 package com.ispringle.dumbcast.fragments;
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentTransaction;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.ispringle.dumbcast.R;
 import com.ispringle.dumbcast.adapters.PodcastAdapter;
@@ -20,6 +26,9 @@ import com.ispringle.dumbcast.data.EpisodeRepository;
 import com.ispringle.dumbcast.data.Podcast;
 import com.ispringle.dumbcast.data.PodcastRepository;
 
+import org.xmlpull.v1.XmlPullParserException;
+
+import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -76,10 +85,54 @@ public class SubscriptionsFragment extends Fragment {
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                Log.d(TAG, "Item clicked at position: " + position);
                 Podcast podcast = adapter.getItem(position);
+                Log.d(TAG, "Podcast: " + (podcast != null ? podcast.getTitle() : "null"));
                 if (podcast != null) {
                     navigateToEpisodeList(podcast);
                 }
+            }
+        });
+
+        // Add touch listener to debug
+        listView.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, android.view.MotionEvent event) {
+                Log.d(TAG, "Touch event on ListView: " + event.getAction());
+                return false; // Don't consume the event
+            }
+        });
+
+        // Add key listener for D-pad and menu button
+        listView.setOnKeyListener(new View.OnKeyListener() {
+            @Override
+            public boolean onKey(View v, int keyCode, KeyEvent event) {
+                if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
+                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        int position = listView.getSelectedItemPosition();
+                        if (position >= 0) {
+                            Podcast podcast = adapter.getItem(position);
+                            if (podcast != null) {
+                                navigateToEpisodeList(podcast);
+                                return true;
+                            }
+                        }
+                    }
+                }
+                // Menu button shows context menu for selected podcast
+                if (keyCode == KeyEvent.KEYCODE_MENU) {
+                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        int position = listView.getSelectedItemPosition();
+                        if (position >= 0) {
+                            Podcast podcast = adapter.getItem(position);
+                            if (podcast != null) {
+                                showContextMenu(podcast);
+                                return true;
+                            }
+                        }
+                    }
+                }
+                return false;
             }
         });
 
@@ -89,6 +142,7 @@ public class SubscriptionsFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+        Log.d(TAG, "onResume called");
         // Refresh data when fragment becomes visible
         loadPodcasts();
     }
@@ -144,6 +198,93 @@ public class SubscriptionsFragment extends Fragment {
         transaction.commit();
 
         Log.d(TAG, "Navigating to episode list for podcast: " + podcast.getTitle());
+    }
+
+    /**
+     * Show context menu for a podcast.
+     * @param podcast The podcast to show options for
+     */
+    private void showContextMenu(Podcast podcast) {
+        if (podcast == null) {
+            return;
+        }
+
+        if (getContext() == null) {
+            return;
+        }
+
+        final String[] menuItems = new String[] {
+            getString(R.string.menu_refresh),
+            getString(R.string.menu_refresh_all),
+            getString(R.string.menu_unsubscribe),
+            getString(R.string.menu_remove_new)
+        };
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle(podcast.getTitle());
+        builder.setItems(menuItems, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                handleContextMenuAction(podcast, which);
+            }
+        });
+        builder.show();
+    }
+
+    /**
+     * Handle context menu action selection.
+     * @param podcast The podcast to perform action on
+     * @param actionIndex The selected menu item index
+     */
+    private void handleContextMenuAction(Podcast podcast, int actionIndex) {
+        switch (actionIndex) {
+            case 0:
+                refreshPodcast(podcast);
+                break;
+            case 1:
+                refreshAllPodcasts();
+                break;
+            case 2:
+                unsubscribePodcast(podcast);
+                break;
+            case 3:
+                removeNewFromAllEpisodes(podcast);
+                break;
+            default:
+                Log.w(TAG, "Unknown menu action index: " + actionIndex);
+                break;
+        }
+    }
+
+    /**
+     * Refresh a single podcast (stub implementation).
+     * @param podcast The podcast to refresh
+     */
+    private void refreshPodcast(Podcast podcast) {
+        Toast.makeText(getContext(), getString(R.string.toast_refresh, podcast.getTitle()), Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * Refresh all podcasts (stub implementation).
+     */
+    private void refreshAllPodcasts() {
+        Toast.makeText(getContext(), getString(R.string.toast_refresh_all), Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * Unsubscribe from a podcast (stub implementation).
+     * @param podcast The podcast to unsubscribe from
+     */
+    private void unsubscribePodcast(Podcast podcast) {
+        Toast.makeText(getContext(), getString(R.string.toast_unsubscribe, podcast.getTitle()), Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * Remove NEW flag from all episodes of a podcast (stub implementation).
+     * @param podcast The podcast to update
+     */
+    private void removeNewFromAllEpisodes(Podcast podcast) {
+        Toast.makeText(getContext(), getString(R.string.toast_remove_new, podcast.getTitle()), Toast.LENGTH_SHORT).show();
     }
 
     /**

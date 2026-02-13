@@ -17,4 +17,12 @@
     <string name="error_network">Network error. Please check your connection.</string>
     <string name="error_empty_search">Please enter a search term</string>
     <string name="error_subscribe">Failed to subscribe. Please try again.</string>
+    <string name="menu_refresh">Refresh</string>
+    <string name="menu_refresh_all">Refresh All</string>
+    <string name="menu_unsubscribe">Unsubscribe</string>
+    <string name="menu_remove_new">Remove NEW from all episodes</string>
+    <string name="toast_refresh">Refresh: %s</string>
+    <string name="toast_refresh_all">Refresh All Podcasts</string>
+    <string name="toast_unsubscribe">Unsubscribe: %s</string>
+    <string name="toast_remove_new">Remove NEW from: %s</string>
 </resources>
