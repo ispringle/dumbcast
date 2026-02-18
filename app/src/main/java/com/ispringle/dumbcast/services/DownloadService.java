@@ -13,6 +13,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 
@@ -544,6 +545,7 @@ public class DownloadService extends Service {
 
     /**
      * Show success notification for completed download.
+     * Notification auto-dismisses after 3 seconds to prevent notification spam.
      *
      * @param episodeTitle The title of the downloaded episode
      */
@@ -555,10 +557,19 @@ public class DownloadService extends Service {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setAutoCancel(true);
 
-        NotificationManager notificationManager =
+        final NotificationManager notificationManager =
             (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         if (notificationManager != null) {
-            notificationManager.notify((int) System.currentTimeMillis(), builder.build());
+            final int notificationId = (int) System.currentTimeMillis();
+            notificationManager.notify(notificationId, builder.build());
+
+            // Auto-dismiss notification after 3 seconds to prevent spam
+            new Handler().postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    notificationManager.cancel(notificationId);
+                }
+            }, 3000);
         }
     }
 
