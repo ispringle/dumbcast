@@ -79,6 +79,14 @@ When subscribing to a new podcast, episodes should NOT be marked as NEW state.
 
 ## Completed Recently
 
+### SubscriptionsFragment Refresh Bypass Fix ✓
+- Fixed SubscriptionsFragment bypassing PodcastRepository refresh methods
+- RefreshPodcastTask now uses PodcastRepository.refreshPodcast()
+- RefreshAllPodcastsTask now uses PodcastRepository.refreshAllPodcasts()
+- Ensures timestamp-based filtering is actually applied when refreshing from UI
+- Removed 114 lines of duplicate manual refresh logic
+- Closes dumbcast-3tz
+
 ### Release Build Setup ✓
 - Created release keystore: app/dumbcast-release.keystore
 - Added signing configuration to build.gradle
