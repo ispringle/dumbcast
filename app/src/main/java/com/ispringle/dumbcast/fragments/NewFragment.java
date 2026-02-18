@@ -11,7 +11,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
-import android.widget.GridView;
+import android.widget.ListView;
 import android.widget.TextView;
 
 import com.ispringle.dumbcast.R;
@@ -41,7 +41,7 @@ public class NewFragment extends Fragment {
 
     private static final String TAG = "NewFragment";
 
-    private GridView listView;
+    private ListView listView;
     private TextView emptyText;
     private PodcastAdapter adapter;
     private PodcastRepository podcastRepository;
@@ -100,38 +100,14 @@ public class NewFragment extends Fragment {
             }
         });
 
-        // Add key listener for D-pad and number keys
+        // Add key listener for D-pad
         listView.setOnKeyListener(new View.OnKeyListener() {
             private long keyPressStartTime = 0;
             private static final long LONG_PRESS_DURATION = 1000; // 1 second
 
             @Override
             public boolean onKey(View v, int keyCode, KeyEvent event) {
-                Log.d(TAG, "Key event on GridView: keyCode=" + keyCode + ", action=" + event.getAction());
-
-                // Handle number keys 1-9 for direct access
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    int position = -1;
-                    switch (keyCode) {
-                        case KeyEvent.KEYCODE_1: position = 0; break;
-                        case KeyEvent.KEYCODE_2: position = 1; break;
-                        case KeyEvent.KEYCODE_3: position = 2; break;
-                        case KeyEvent.KEYCODE_4: position = 3; break;
-                        case KeyEvent.KEYCODE_5: position = 4; break;
-                        case KeyEvent.KEYCODE_6: position = 5; break;
-                        case KeyEvent.KEYCODE_7: position = 6; break;
-                        case KeyEvent.KEYCODE_8: position = 7; break;
-                        case KeyEvent.KEYCODE_9: position = 8; break;
-                    }
-
-                    if (position >= 0 && position < adapter.getCount()) {
-                        Podcast podcast = adapter.getItem(position);
-                        if (podcast != null) {
-                            navigateToEpisodeList(podcast);
-                            return true;
-                        }
-                    }
-                }
+                Log.d(TAG, "Key event on ListView: keyCode=" + keyCode + ", action=" + event.getAction());
 
                 if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
                     int position = listView.getSelectedItemPosition();

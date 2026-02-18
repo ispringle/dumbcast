@@ -16,13 +16,10 @@
         android:padding="32dp"
         android:visibility="gone" />
 
-    <GridView
+    <ListView
         android:id="@+id/subscriptions_list"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:numColumns="3"
-        android:horizontalSpacing="8dp"
-        android:verticalSpacing="8dp"
         android:focusable="true"
         android:focusableInTouchMode="false"
         android:descendantFocusability="afterDescendants" />

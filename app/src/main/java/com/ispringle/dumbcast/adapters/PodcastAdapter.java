@@ -5,7 +5,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
-import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -18,11 +17,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Custom ArrayAdapter for displaying Podcast objects in a ListView or GridView.
+ * Custom ArrayAdapter for displaying Podcast objects in a ListView.
  * Uses ViewHolder pattern for performance.
- * Automatically detects parent type and uses appropriate layout:
- * - GridView: Shows podcast artwork in a grid layout
- * - ListView: Shows podcast title, description (truncated), and episode count
+ * Shows podcast artwork, title, description (truncated), and episode count.
  */
 public class PodcastAdapter extends ArrayAdapter<Podcast> {
 
@@ -31,20 +28,12 @@ public class PodcastAdapter extends ArrayAdapter<Podcast> {
 
     /**
      * ViewHolder pattern to cache view references for performance.
-     * Supports both list and grid layouts.
      */
     private static class ViewHolder {
-        // List layout views
+        ImageView artworkImage;
         TextView titleText;
         TextView descriptionText;
         TextView episodeCountText;
-
-        // Grid layout views
-        ImageView artworkImage;
-        TextView titleTextGrid;
-
-        // Track which layout type this holder is for
-        boolean isGridLayout;
     }
 
     public PodcastAdapter(Context context, List<Podcast> podcasts, Map<Long, Integer> episodeCounts) {
@@ -56,27 +45,14 @@ public class PodcastAdapter extends ArrayAdapter<Podcast> {
     @Override
     public View getView(int position, View convertView, ViewGroup parent) {
         ViewHolder holder;
-        boolean isGridView = parent instanceof GridView;
 
-        // Check if we need to inflate a new view or if we can reuse
-        // Make sure we don't mix list and grid view holders
-        if (convertView == null || (convertView.getTag() instanceof ViewHolder &&
-                ((ViewHolder) convertView.getTag()).isGridLayout != isGridView)) {
+        if (convertView == null) {
             holder = new ViewHolder();
-            holder.isGridLayout = isGridView;
-
-            if (isGridView) {
-                // Inflate grid layout for GridView
-                convertView = inflater.inflate(R.layout.item_podcast_grid, parent, false);
-                holder.artworkImage = convertView.findViewById(R.id.podcast_artwork);
-                holder.titleTextGrid = convertView.findViewById(R.id.podcast_title_grid);
-            } else {
-                // Inflate list layout for ListView
-                convertView = inflater.inflate(R.layout.item_podcast, parent, false);
-                holder.titleText = convertView.findViewById(R.id.podcast_title);
-                holder.descriptionText = convertView.findViewById(R.id.podcast_description);
-                holder.episodeCountText = convertView.findViewById(R.id.podcast_episode_count);
-            }
+            convertView = inflater.inflate(R.layout.item_podcast, parent, false);
+            holder.artworkImage = convertView.findViewById(R.id.podcast_artwork);
+            holder.titleText = convertView.findViewById(R.id.podcast_title);
+            holder.descriptionText = convertView.findViewById(R.id.podcast_description);
+            holder.episodeCountText = convertView.findViewById(R.id.podcast_episode_count);
             convertView.setTag(holder);
         } else {
             holder = (ViewHolder) convertView.getTag();
@@ -84,51 +60,44 @@ public class PodcastAdapter extends ArrayAdapter<Podcast> {
 
         Podcast podcast = getItem(position);
         if (podcast != null) {
-            if (isGridView) {
-                // Grid view: Load podcast artwork
-                ImageLoader.getInstance(getContext()).loadImage(
-                    getContext(),
-                    podcast.getArtworkUrl(),
-                    holder.artworkImage
-                );
+            // Load podcast artwork
+            ImageLoader.getInstance(getContext()).loadImage(
+                getContext(),
+                podcast.getArtworkUrl(),
+                holder.artworkImage
+            );
 
-                // Optionally show title (currently hidden by default)
-                if (holder.titleTextGrid != null) {
-                    holder.titleTextGrid.setText(podcast.getTitle());
+            // Set title
+            holder.titleText.setText(podcast.getTitle());
+
+            // Set description (parse HTML and truncate to 100 characters)
+            String description = podcast.getDescription();
+            if (description != null && !description.isEmpty()) {
+                // Parse HTML for proper formatting
+                CharSequence formattedDescription;
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                    formattedDescription = android.text.Html.fromHtml(description, android.text.Html.FROM_HTML_MODE_COMPACT);
+                } else {
+                    formattedDescription = android.text.Html.fromHtml(description);
                 }
+
+                // Truncate if needed
+                if (formattedDescription.length() > 100) {
+                    holder.descriptionText.setText(formattedDescription.subSequence(0, 97) + "...");
+                } else {
+                    holder.descriptionText.setText(formattedDescription);
+                }
+                holder.descriptionText.setVisibility(View.VISIBLE);
             } else {
-                // List view: Show title, description, and episode count
-                holder.titleText.setText(podcast.getTitle());
+                holder.descriptionText.setVisibility(View.GONE);
+            }
 
-                // Set description (parse HTML and truncate to 100 characters for list view)
-                String description = podcast.getDescription();
-                if (description != null && !description.isEmpty()) {
-                    // Parse HTML for proper formatting
-                    CharSequence formattedDescription;
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-                        formattedDescription = android.text.Html.fromHtml(description, android.text.Html.FROM_HTML_MODE_COMPACT);
-                    } else {
-                        formattedDescription = android.text.Html.fromHtml(description);
-                    }
-
-                    // Truncate if needed
-                    if (formattedDescription.length() > 100) {
-                        holder.descriptionText.setText(formattedDescription.subSequence(0, 97) + "...");
-                    } else {
-                        holder.descriptionText.setText(formattedDescription);
-                    }
-                    holder.descriptionText.setVisibility(View.VISIBLE);
-                } else {
-                    holder.descriptionText.setVisibility(View.GONE);
-                }
-
-                // Get and display episode count from cached map
-                Integer episodeCount = episodeCounts.get(podcast.getId());
-                if (episodeCount != null) {
-                    holder.episodeCountText.setText(episodeCount + " eps");
-                } else {
-                    holder.episodeCountText.setText("0 eps");
-                }
+            // Get and display episode count from cached map
+            Integer episodeCount = episodeCounts.get(podcast.getId());
+            if (episodeCount != null) {
+                holder.episodeCountText.setText(episodeCount + " eps");
+            } else {
+                holder.episodeCountText.setText("0 eps");
             }
         }
 

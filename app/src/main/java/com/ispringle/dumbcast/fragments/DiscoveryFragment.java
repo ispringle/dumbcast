@@ -16,7 +16,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.GridView;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -48,7 +48,7 @@ public class DiscoveryFragment extends Fragment {
     private EditText searchInput;
     private Button searchButton;
     private TextView statusMessage;
-    private GridView resultsList;
+    private ListView resultsList;
     private SearchResultAdapter adapter;
     private PodcastRepository podcastRepository;
 
@@ -115,34 +115,10 @@ public class DiscoveryFragment extends Fragment {
             }
         });
 
-        // Add key listener for D-pad navigation and number keys
+        // Add key listener for D-pad navigation
         resultsList.setOnKeyListener(new View.OnKeyListener() {
             @Override
             public boolean onKey(View v, int keyCode, KeyEvent event) {
-                // Handle number keys 1-9 for direct access
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    int position = -1;
-                    switch (keyCode) {
-                        case KeyEvent.KEYCODE_1: position = 0; break;
-                        case KeyEvent.KEYCODE_2: position = 1; break;
-                        case KeyEvent.KEYCODE_3: position = 2; break;
-                        case KeyEvent.KEYCODE_4: position = 3; break;
-                        case KeyEvent.KEYCODE_5: position = 4; break;
-                        case KeyEvent.KEYCODE_6: position = 5; break;
-                        case KeyEvent.KEYCODE_7: position = 6; break;
-                        case KeyEvent.KEYCODE_8: position = 7; break;
-                        case KeyEvent.KEYCODE_9: position = 8; break;
-                    }
-
-                    if (position >= 0 && position < adapter.getCount()) {
-                        PodcastIndexApi.SearchResult result = adapter.getItem(position);
-                        if (result != null) {
-                            showSubscribeDialog(result);
-                            return true;
-                        }
-                    }
-                }
-
                 if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
                     if (event.getAction() == KeyEvent.ACTION_DOWN) {
                         int position = resultsList.getSelectedItemPosition();
