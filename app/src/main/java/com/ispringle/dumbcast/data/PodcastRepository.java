@@ -501,8 +501,9 @@ public class PodcastRepository {
                 if (isInitialSubscription) {
                     // Initial subscription: Give session grace (old episodes won't bug you)
                     // No description stored (saves ~5-10KB per episode)
-                    // BACKLOG should be manual only, so don't set state
+                    // Set to AVAILABLE instead of NEW to avoid overwhelming user
                     episode.setSessionGrace(true);
+                    episode.setState(EpisodeState.AVAILABLE);
                 } else {
                     // Subsequent refresh: Recent episodes are NEW with description
                     if (isOldEpisode) {
