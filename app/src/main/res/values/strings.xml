@@ -29,12 +29,14 @@
     <string name="menu_play">Play</string>
     <string name="menu_download">Download</string>
     <string name="menu_add_to_backlog">Add to Backlog</string>
+    <string name="menu_remove_from_backlog">Remove from Backlog</string>
     <string name="menu_remove_new_episode">Remove NEW</string>
     <string name="toast_download_started">Download started</string>
     <string name="toast_already_in_backlog">Already in backlog</string>
     <string name="toast_cannot_save_listened">Cannot save listened episodes to backlog</string>
     <string name="toast_saved_to_backlog">Saved to backlog</string>
     <string name="toast_failed_save_backlog">Failed to save to backlog</string>
+    <string name="toast_removed_from_backlog">Removed from backlog</string>
     <string name="toast_download_deleted">Download deleted</string>
     <string name="toast_failed_delete_download">Failed to delete download</string>
     <string name="toast_marked_viewed">Marked as viewed</string>
@@ -59,7 +61,7 @@
     <string name="menu_view_podcast_info">View Podcast Info</string>
     <string name="toast_already_subscribed">Already subscribed to this podcast</string>
     <string name="dialog_podcast_info_title">Podcast Info</string>
-    <string name="dialog_subscribe_confirm">Subscribe to \"%s\"?</string>
+    <string name="dialog_subscribe_confirm">Subscribe to \"%s\"</string>
     <string name="podcast_info_author">Author: %s</string>
     <string name="podcast_info_episodes">Episodes: %d</string>
     <string name="podcast_info_description">Description:\n%s</string>
