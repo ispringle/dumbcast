@@ -21,6 +21,7 @@ public class Episode {
     private Long downloadedAt;
     private boolean sessionGrace;
     private String chaptersUrl;
+    private String artworkUrl;
 
     // Constructor
     public Episode(long podcastId, String guid, String title, String enclosureUrl, long publishedAt) {
@@ -87,6 +88,9 @@ public class Episode {
 
     public String getChaptersUrl() { return chaptersUrl; }
     public void setChaptersUrl(String url) { this.chaptersUrl = url; }
+
+    public String getArtworkUrl() { return artworkUrl; }
+    public void setArtworkUrl(String url) { this.artworkUrl = url; }
 
     public boolean isDownloaded() {
         return downloadPath != null && downloadedAt != null;

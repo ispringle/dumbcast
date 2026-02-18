@@ -458,6 +458,9 @@ public class EpisodeRepository {
         if (episode.getChaptersUrl() != null) {
             values.put(DatabaseHelper.COL_EPISODE_CHAPTERS_URL, episode.getChaptersUrl());
         }
+        if (episode.getArtworkUrl() != null) {
+            values.put(DatabaseHelper.COL_EPISODE_ARTWORK_URL, episode.getArtworkUrl());
+        }
 
         return values;
     }
@@ -521,6 +524,11 @@ public class EpisodeRepository {
         int chaptersUrlIndex = cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EPISODE_CHAPTERS_URL);
         if (!cursor.isNull(chaptersUrlIndex)) {
             episode.setChaptersUrl(cursor.getString(chaptersUrlIndex));
+        }
+
+        int artworkUrlIndex = cursor.getColumnIndexOrThrow(DatabaseHelper.COL_EPISODE_ARTWORK_URL);
+        if (!cursor.isNull(artworkUrlIndex)) {
+            episode.setArtworkUrl(cursor.getString(artworkUrlIndex));
         }
 
         return episode;

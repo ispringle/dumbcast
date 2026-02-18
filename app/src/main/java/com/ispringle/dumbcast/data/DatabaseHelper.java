@@ -9,7 +9,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 public class DatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "dumbcast.db";
-    private static final int DATABASE_VERSION = 3;
+    private static final int DATABASE_VERSION = 4;
 
     // Table names
     public static final String TABLE_PODCASTS = "podcasts";
@@ -47,6 +47,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COL_EPISODE_DOWNLOADED_AT = "downloaded_at";
     public static final String COL_EPISODE_SESSION_GRACE = "session_grace";
     public static final String COL_EPISODE_CHAPTERS_URL = "chapters_url";
+    public static final String COL_EPISODE_ARTWORK_URL = "artwork_url";
 
     private static final String CREATE_PODCASTS_TABLE =
         "CREATE TABLE " + TABLE_PODCASTS + " (" +
@@ -82,6 +83,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         COL_EPISODE_DOWNLOADED_AT + " INTEGER, " +
         COL_EPISODE_SESSION_GRACE + " INTEGER DEFAULT 0, " +
         COL_EPISODE_CHAPTERS_URL + " TEXT, " +
+        COL_EPISODE_ARTWORK_URL + " TEXT, " +
         "FOREIGN KEY(" + COL_EPISODE_PODCAST_ID + ") REFERENCES " +
         TABLE_PODCASTS + "(" + COL_PODCAST_ID + ") ON DELETE CASCADE, " +
         "UNIQUE(" + COL_EPISODE_PODCAST_ID + ", " + COL_EPISODE_GUID + "))";
@@ -169,6 +171,12 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             // Migration from version 2 to 3: Add reverse_order column to podcasts
             db.execSQL("ALTER TABLE " + TABLE_PODCASTS + " ADD COLUMN " +
                 COL_PODCAST_REVERSE_ORDER + " INTEGER DEFAULT 0");
+        }
+
+        if (oldVersion < 4) {
+            // Migration from version 3 to 4: Add artwork_url column to episodes
+            db.execSQL("ALTER TABLE " + TABLE_EPISODES + " ADD COLUMN " +
+                COL_EPISODE_ARTWORK_URL + " TEXT");
         }
     }
 }

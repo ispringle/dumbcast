@@ -274,13 +274,10 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
         // Update episode info
         episodeTitleText.setText(currentEpisode.getTitle());
 
-        // Load podcast artwork
+        // Load artwork with fallback: try episode artwork first, fall back to podcast artwork
         Podcast podcast = podcastRepository.getPodcastById(currentEpisode.getPodcastId());
         if (podcast != null) {
-            // Load artwork with fallback: try episode artwork first, fall back to podcast artwork
-            // Note: Episode.artworkUrl doesn't exist yet, so primaryUrl is always null for now
-            // This prepares the infrastructure for when episode-level artwork is added
-            String episodeArtworkUrl = null; // TODO: currentEpisode.getArtworkUrl() when field is added
+            String episodeArtworkUrl = currentEpisode.getArtworkUrl();
             String podcastArtworkUrl = podcast.getArtworkUrl();
             ImageLoader.getInstance(getContext()).loadImageWithFallback(
                 getContext(), episodeArtworkUrl, podcastArtworkUrl, artworkImage);

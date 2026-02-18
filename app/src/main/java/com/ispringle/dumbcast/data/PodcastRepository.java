@@ -537,6 +537,7 @@ public class PodcastRepository {
                 episode.setEnclosureLength(item.getEnclosureLength());
                 episode.setDuration(item.getDuration());
                 episode.setChaptersUrl(item.getChaptersUrl());
+                episode.setArtworkUrl(item.getImageUrl());
                 episode.setFetchedAt(now);
 
                 long publishedAt = item.getPublishedAt();
