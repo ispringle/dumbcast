@@ -418,11 +418,38 @@ public class PodcastRepository {
             }
         }
 
-        Log.d(TAG, "Processing " + feed.getItems().size() + " items from feed for podcast ID: " + podcastId + " (max new: " + maxNewEpisodes + ", lastRefresh: " + lastRefreshAt + ")");
+        Log.d(TAG, "=== REFRESH DIAGNOSTICS ===");
+        Log.d(TAG, "Processing " + feed.getItems().size() + " items from feed for podcast ID: " + podcastId);
+        Log.d(TAG, "isInitialSubscription: " + isInitialSubscription);
+        Log.d(TAG, "maxNewEpisodes: " + maxNewEpisodes);
+        Log.d(TAG, "lastRefreshAt timestamp: " + lastRefreshAt + " (" + new java.util.Date(lastRefreshAt) + ")");
+
+        int timestampSkippedCount = 0;
+        int duplicateSkippedCount = 0;
+        int invalidPublishDateCount = 0;
 
         db.beginTransaction();
         try {
+            int processedCount = 0;
             for (RssFeed.RssItem item : feed.getItems()) {
+                processedCount++;
+
+                // Diagnostic logging for each episode
+                long episodePublishedAt = item.getPublishedAt();
+                boolean hasValidPublishDate = episodePublishedAt > 0;
+                boolean isOlderThanLastRefresh = hasValidPublishDate && lastRefreshAt > 0 && episodePublishedAt < lastRefreshAt;
+
+                Log.d(TAG, String.format("Episode #%d: '%s'", processedCount, item.getTitle()));
+                Log.d(TAG, String.format("  publishedAt: %d (%s)", episodePublishedAt,
+                    hasValidPublishDate ? new java.util.Date(episodePublishedAt).toString() : "INVALID/ZERO"));
+                Log.d(TAG, String.format("  hasValidPublishDate: %b, isOlderThanLastRefresh: %b",
+                    hasValidPublishDate, isOlderThanLastRefresh));
+
+                if (!hasValidPublishDate) {
+                    invalidPublishDateCount++;
+                    Log.w(TAG, "  WARNING: Episode has invalid/zero publishedAt timestamp!");
+                }
+
                 // Stop processing if we've hit too many consecutive duplicates
                 // This prevents re-processing thousands of old episodes on refresh
                 if (consecutiveDuplicates >= DUPLICATE_THRESHOLD) {
@@ -436,12 +463,26 @@ public class PodcastRepository {
                     break;
                 }
 
-                // For refreshes (not initial subscription), skip episodes published before last refresh
-                // This prevents processing hundreds of old episodes when only checking for new ones
-                if (!isInitialSubscription && lastRefreshAt > 0 && item.getPublishedAt() > 0 && item.getPublishedAt() < lastRefreshAt) {
-                    Log.d(TAG, "Skipping old episode (published before last refresh): " + item.getTitle());
-                    skippedCount++;
-                    continue;
+                // For refreshes (not initial subscription), apply timestamp-based filtering
+                if (!isInitialSubscription && lastRefreshAt > 0) {
+                    long episodePublishTime = item.getPublishedAt();
+
+                    // Skip episodes without valid publish dates - they can't be reliably filtered
+                    // This prevents hundreds of undated old episodes from being added on refresh
+                    if (episodePublishTime == 0) {
+                        Log.d(TAG, "  DECISION: Skipping (no valid publish date during refresh)");
+                        timestampSkippedCount++;
+                        skippedCount++;
+                        continue;
+                    }
+
+                    // Skip episodes published before last refresh
+                    if (episodePublishTime < lastRefreshAt) {
+                        Log.d(TAG, "  DECISION: Skipping (timestamp filter - published before last refresh)");
+                        timestampSkippedCount++;
+                        skippedCount++;
+                        continue;
+                    }
                 }
                 // Only require title - GUID and enclosureUrl are now optional
                 if (item.getTitle() == null || item.getTitle().trim().isEmpty()) {
@@ -470,7 +511,8 @@ public class PodcastRepository {
 
                 // Check if episode already exists
                 if (episodeExists(podcastId, guid)) {
-                    Log.d(TAG, "Episode already exists, skipping: " + item.getTitle());
+                    Log.d(TAG, "  DECISION: Skipping (duplicate - episode already exists)");
+                    duplicateSkippedCount++;
                     skippedCount++;
                     consecutiveDuplicates++;
                     continue;
@@ -478,6 +520,8 @@ public class PodcastRepository {
 
                 // Reset consecutive duplicate counter when we find a new episode
                 consecutiveDuplicates = 0;
+
+                Log.d(TAG, "  DECISION: Adding episode (new episode)");
 
                 // Create new episode with potentially generated GUID
                 Episode episode = new Episode(
@@ -526,8 +570,14 @@ public class PodcastRepository {
             }
 
             db.setTransactionSuccessful();
-            Log.d(TAG, "Inserted " + newEpisodeCount + " new episodes for podcast " + podcastId +
-                  " (skipped " + skippedCount + " existing/invalid items)");
+            Log.d(TAG, "=== REFRESH SUMMARY ===");
+            Log.d(TAG, "Total episodes in feed: " + feed.getItems().size());
+            Log.d(TAG, "New episodes added: " + newEpisodeCount);
+            Log.d(TAG, "Total skipped: " + skippedCount);
+            Log.d(TAG, "  - Skipped by timestamp filter: " + timestampSkippedCount);
+            Log.d(TAG, "  - Skipped as duplicates: " + duplicateSkippedCount);
+            Log.d(TAG, "  - Episodes with invalid/zero publish dates: " + invalidPublishDateCount);
+            Log.d(TAG, "=======================");
         } finally {
             db.endTransaction();
         }

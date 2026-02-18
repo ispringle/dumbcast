@@ -251,7 +251,9 @@ public class RssParser {
 
     private long parseDate(String dateStr) {
         if (dateStr == null || dateStr.isEmpty()) {
-            return System.currentTimeMillis();
+            // Return 0 for missing dates instead of current time
+            // This allows refresh logic to properly filter out episodes without valid dates
+            return 0;
         }
 
         // Try RFC822 format (standard RSS)
@@ -271,10 +273,10 @@ public class RssParser {
                 return date.getTime();
             }
         } catch (ParseException e) {
-            // Use current time as fallback
+            // Return 0 for unparseable dates instead of current time
         }
 
-        return System.currentTimeMillis();
+        return 0;
     }
 
     private int parseDuration(String durationStr) {
