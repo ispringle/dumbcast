@@ -587,6 +587,12 @@ public class PlaybackService extends Service {
                 }
             }
 
+            // Auto-remove from BACKLOG on completion
+            if (currentEpisode.getState() == EpisodeState.BACKLOG) {
+                removeFromBacklog();
+                Log.d(TAG, "Episode auto-removed from BACKLOG on completion");
+            }
+
             // Notify listener
             if (listener != null) {
                 listener.onPlaybackCompleted(currentEpisode);
@@ -717,6 +723,37 @@ public class PlaybackService extends Service {
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "Error marking episode as LISTENED in database", e);
+                }
+            });
+        }
+    }
+
+    /**
+     * Remove episode from BACKLOG by setting state to AVAILABLE
+     * This happens automatically when a BACKLOG episode finishes playing
+     */
+    private void removeFromBacklog() {
+        if (currentEpisode == null) {
+            return;
+        }
+
+        final long episodeId = currentEpisode.getId();
+
+        // Update in-memory episode
+        currentEpisode.setState(EpisodeState.AVAILABLE);
+
+        // Update database on background thread
+        if (dbExecutor != null && !dbExecutor.isShutdown()) {
+            dbExecutor.execute(() -> {
+                try {
+                    int rowsAffected = episodeRepo.updateEpisodeState(episodeId, EpisodeState.AVAILABLE);
+                    if (rowsAffected > 0) {
+                        Log.d(TAG, "Episode removed from BACKLOG in database: " + episodeId);
+                    } else {
+                        Log.w(TAG, "Failed to remove from BACKLOG - episode may have been deleted: " + episodeId);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error removing episode from BACKLOG in database", e);
                 }
             });
         }
