@@ -114,7 +114,20 @@ public class PlaybackService extends Service {
         mediaPlayer.setOnCompletionListener(mp -> onPlaybackCompleted());
         mediaPlayer.setOnErrorListener((mp, what, extra) -> {
             Log.e(TAG, "MediaPlayer error: what=" + what + ", extra=" + extra);
-            notifyError("Playback error occurred");
+
+            // Error code -38 is MEDIA_ERROR_NOT_VALID_FOR_PROGRESSIVE_PLAYBACK
+            // This is a spurious error that occurs during prepareAsync() but doesn't
+            // actually prevent playback. The file plays successfully despite this error.
+            // See: https://issuetracker.google.com/issues/36905654
+            if (what == -38) {
+                Log.d(TAG, "Ignoring spurious error -38 (MEDIA_ERROR_NOT_VALID_FOR_PROGRESSIVE_PLAYBACK)");
+                return true; // Error handled, don't show toast
+            }
+
+            // For other errors, log details and notify user
+            String errorMsg = "Playback error: " + getErrorDescription(what, extra);
+            Log.e(TAG, errorMsg);
+            notifyError(errorMsg);
             return true;
         });
         mediaPlayer.setOnPreparedListener(mp -> {
@@ -827,5 +840,45 @@ public class PlaybackService extends Service {
         if (listener != null) {
             listener.onError(error);
         }
+    }
+
+    /**
+     * Get human-readable description of MediaPlayer error codes
+     */
+    private String getErrorDescription(int what, int extra) {
+        String whatStr;
+        switch (what) {
+            case MediaPlayer.MEDIA_ERROR_UNKNOWN:
+                whatStr = "MEDIA_ERROR_UNKNOWN";
+                break;
+            case MediaPlayer.MEDIA_ERROR_SERVER_DIED:
+                whatStr = "MEDIA_ERROR_SERVER_DIED";
+                break;
+            case -38:
+                whatStr = "MEDIA_ERROR_NOT_VALID_FOR_PROGRESSIVE_PLAYBACK";
+                break;
+            default:
+                whatStr = "Error " + what;
+        }
+
+        String extraStr;
+        switch (extra) {
+            case MediaPlayer.MEDIA_ERROR_IO:
+                extraStr = "MEDIA_ERROR_IO";
+                break;
+            case MediaPlayer.MEDIA_ERROR_MALFORMED:
+                extraStr = "MEDIA_ERROR_MALFORMED";
+                break;
+            case MediaPlayer.MEDIA_ERROR_UNSUPPORTED:
+                extraStr = "MEDIA_ERROR_UNSUPPORTED";
+                break;
+            case MediaPlayer.MEDIA_ERROR_TIMED_OUT:
+                extraStr = "MEDIA_ERROR_TIMED_OUT";
+                break;
+            default:
+                extraStr = "Extra " + extra;
+        }
+
+        return whatStr + " (" + extraStr + ")";
     }
 }
