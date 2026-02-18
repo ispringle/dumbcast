@@ -340,7 +340,9 @@ public class EpisodeListFragment extends Fragment {
         FragmentTransaction transaction = getActivity().getSupportFragmentManager().beginTransaction();
         transaction.replace(R.id.fragment_container, playerFragment);
         transaction.addToBackStack(null);
-        transaction.commit();
+        // Use commitNow() to ensure fragment is in place before D-pad navigation can happen
+        // This fixes issue where D-pad left/right would use old tab position instead of Now Playing
+        transaction.commitNow();
 
         Log.d(TAG, "Navigating to player for episode: " + episode.getTitle());
     }
