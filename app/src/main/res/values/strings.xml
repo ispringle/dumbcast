@@ -117,4 +117,32 @@
     <string name="load_episode_message">Load an episode to start playback</string>
     <string name="artwork_description">Episode artwork</string>
     <string name="podcast_artwork_description">Podcast artwork</string>
+
+    <!-- Podcast Details -->
+    <string name="menu_podcast_details">View Details</string>
+    <string name="podcast_details_title">Podcast Details</string>
+    <string name="podcast_details_feed_url">Feed URL: %s</string>
+    <string name="podcast_details_created_at">Subscribed: %s</string>
+    <string name="podcast_details_last_refresh">Last Refresh: %s</string>
+    <string name="podcast_details_no_refresh">Never refreshed</string>
+    <string name="podcast_details_reverse_order">Reverse Episode Order: %s</string>
+    <string name="podcast_details_yes">Yes</string>
+    <string name="podcast_details_no">No</string>
+
+    <!-- Episode Details -->
+    <string name="menu_episode_details">View Details</string>
+    <string name="episode_details_title">Episode Details</string>
+    <string name="episode_details_published">Published: %s</string>
+    <string name="episode_details_duration">Duration: %s</string>
+    <string name="episode_details_file_size">File Size: %s</string>
+    <string name="episode_details_state">State: %s</string>
+    <string name="episode_details_downloaded">Downloaded: %s</string>
+    <string name="episode_details_download_path">Download Path: %s</string>
+    <string name="episode_details_chapters_url">Chapters URL: %s</string>
+    <string name="episode_details_enclosure_url">Media URL: %s</string>
+    <string name="episode_details_guid">GUID: %s</string>
+    <string name="episode_details_fetched">Fetched: %s</string>
+    <string name="episode_details_not_downloaded">Not downloaded</string>
+    <string name="episode_details_no_chapters">No chapters</string>
+    <string name="episode_details_unknown_duration">Unknown</string>
 </resources>

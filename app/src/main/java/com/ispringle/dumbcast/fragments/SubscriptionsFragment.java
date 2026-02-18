@@ -216,6 +216,7 @@ public class SubscriptionsFragment extends Fragment {
         }
 
         final String[] menuItems = new String[] {
+            getString(R.string.menu_podcast_details),
             getString(R.string.menu_refresh),
             getString(R.string.menu_refresh_all),
             getString(R.string.menu_unsubscribe),
@@ -241,21 +242,93 @@ public class SubscriptionsFragment extends Fragment {
     private void handleContextMenuAction(Podcast podcast, int actionIndex) {
         switch (actionIndex) {
             case 0:
-                refreshPodcast(podcast);
+                showPodcastDetails(podcast);
                 break;
             case 1:
-                refreshAllPodcasts();
+                refreshPodcast(podcast);
                 break;
             case 2:
-                unsubscribePodcast(podcast);
+                refreshAllPodcasts();
                 break;
             case 3:
+                unsubscribePodcast(podcast);
+                break;
+            case 4:
                 removeNewFromAllEpisodes(podcast);
                 break;
             default:
                 Log.w(TAG, "Unknown menu action index: " + actionIndex);
                 break;
         }
+    }
+
+    /**
+     * Show detailed information about a podcast.
+     * @param podcast The podcast to show details for
+     */
+    private void showPodcastDetails(Podcast podcast) {
+        if (getContext() == null) {
+            return;
+        }
+
+        // Build detailed information
+        StringBuilder details = new StringBuilder();
+
+        // Description
+        if (podcast.getDescription() != null && !podcast.getDescription().isEmpty()) {
+            details.append(podcast.getDescription()).append("\n\n");
+        }
+
+        // Feed URL
+        details.append(getString(R.string.podcast_details_feed_url, podcast.getFeedUrl())).append("\n\n");
+
+        // Created/Subscribed date
+        details.append(getString(R.string.podcast_details_created_at,
+            formatTimestamp(podcast.getCreatedAt()))).append("\n\n");
+
+        // Last refresh date
+        if (podcast.getLastRefreshAt() > 0) {
+            details.append(getString(R.string.podcast_details_last_refresh,
+                formatTimestamp(podcast.getLastRefreshAt()))).append("\n\n");
+        } else {
+            details.append(getString(R.string.podcast_details_no_refresh)).append("\n\n");
+        }
+
+        // Reverse order setting
+        String reverseOrderValue = podcast.isReverseOrder() ?
+            getString(R.string.podcast_details_yes) :
+            getString(R.string.podcast_details_no);
+        details.append(getString(R.string.podcast_details_reverse_order, reverseOrderValue)).append("\n\n");
+
+        // Artwork URL (if available)
+        if (podcast.getArtworkUrl() != null && !podcast.getArtworkUrl().isEmpty()) {
+            details.append("Artwork URL: ").append(podcast.getArtworkUrl()).append("\n\n");
+        }
+
+        // Podcast Index ID (if available)
+        if (podcast.getPodcastIndexId() != null) {
+            details.append("Podcast Index ID: ").append(podcast.getPodcastIndexId());
+        }
+
+        // Show dialog with scrollable text
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle(getString(R.string.podcast_details_title));
+        builder.setMessage(details.toString().trim());
+        builder.setPositiveButton(getString(R.string.dialog_close), null);
+        builder.show();
+    }
+
+    /**
+     * Format a timestamp (milliseconds) into a human-readable date/time string.
+     * @param timestamp The timestamp in milliseconds
+     * @return Formatted date/time string
+     */
+    private String formatTimestamp(long timestamp) {
+        if (timestamp <= 0) {
+            return "Unknown";
+        }
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MMM d, yyyy h:mm a", java.util.Locale.getDefault());
+        return sdf.format(new java.util.Date(timestamp));
     }
 
     /**

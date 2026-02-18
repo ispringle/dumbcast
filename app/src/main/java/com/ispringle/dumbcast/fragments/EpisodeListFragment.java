@@ -436,6 +436,9 @@ public class EpisodeListFragment extends Fragment {
         // Build menu items conditionally
         final List<String> menuItems = new ArrayList<>();
 
+        // Always show View Details first
+        menuItems.add(getString(R.string.menu_episode_details));
+
         // If downloaded: show Delete Download and Play
         if (episode.isDownloaded()) {
             menuItems.add(getString(R.string.menu_delete_download));
@@ -476,21 +479,47 @@ public class EpisodeListFragment extends Fragment {
     /**
      * Handle context menu action selection.
      * Menu indices depend on episode state:
-     * - If downloaded: 0=Delete Download, 1=Play, 2=Add to Backlog, 3=Remove from Backlog (if BACKLOG), 4=Remove NEW (if NEW)
-     * - If not downloaded: 0=Download, 1=Add to Backlog, 2=Remove from Backlog (if BACKLOG), 3=Remove NEW (if NEW)
+     * - If downloaded: 0=View Details, 1=Delete Download, 2=Play, 3=Add to Backlog, 4=Remove from Backlog (if BACKLOG), 5=Remove NEW (if NEW)
+     * - If not downloaded: 0=View Details, 1=Download, 2=Add to Backlog, 3=Remove from Backlog (if BACKLOG), 4=Remove NEW (if NEW)
      *
      * @param episode The episode to act on
      * @param actionIndex The selected menu item index
      */
     private void handleContextMenuAction(Episode episode, int actionIndex) {
         if (episode.isDownloaded()) {
-            // Downloaded menu: Delete Download, Play, Add to Backlog, [Remove from Backlog], [Remove NEW]
+            // Downloaded menu: View Details, Delete Download, Play, Add to Backlog, [Remove from Backlog], [Remove NEW]
             switch (actionIndex) {
-                case 0: // Delete Download
+                case 0: // View Details
+                    showEpisodeDetails(episode);
+                    break;
+                case 1: // Delete Download
                     deleteDownload(episode);
                     break;
-                case 1: // Play
+                case 2: // Play
                     handleEpisodeClick(episode);
+                    break;
+                case 3: // Add to Backlog
+                    addToBacklog(episode);
+                    break;
+                case 4: // Remove from Backlog (if BACKLOG) or Remove NEW (if NEW and not BACKLOG)
+                    if (episode.getState() == EpisodeState.BACKLOG) {
+                        removeFromBacklog(episode);
+                    } else {
+                        removeNew(episode);
+                    }
+                    break;
+                case 5: // Remove NEW (only if both BACKLOG and NEW - shouldn't happen but handle it)
+                    removeNew(episode);
+                    break;
+            }
+        } else {
+            // Not downloaded menu: View Details, Download, Add to Backlog, [Remove from Backlog], [Remove NEW]
+            switch (actionIndex) {
+                case 0: // View Details
+                    showEpisodeDetails(episode);
+                    break;
+                case 1: // Download
+                    downloadEpisode(episode);
                     break;
                 case 2: // Add to Backlog
                     addToBacklog(episode);
@@ -506,27 +535,157 @@ public class EpisodeListFragment extends Fragment {
                     removeNew(episode);
                     break;
             }
-        } else {
-            // Not downloaded menu: Download, Add to Backlog, [Remove from Backlog], [Remove NEW]
-            switch (actionIndex) {
-                case 0: // Download
-                    downloadEpisode(episode);
-                    break;
-                case 1: // Add to Backlog
-                    addToBacklog(episode);
-                    break;
-                case 2: // Remove from Backlog (if BACKLOG) or Remove NEW (if NEW and not BACKLOG)
-                    if (episode.getState() == EpisodeState.BACKLOG) {
-                        removeFromBacklog(episode);
-                    } else {
-                        removeNew(episode);
-                    }
-                    break;
-                case 3: // Remove NEW (only if both BACKLOG and NEW - shouldn't happen but handle it)
-                    removeNew(episode);
-                    break;
-            }
         }
+    }
+
+    /**
+     * Show detailed information about an episode.
+     * @param episode The episode to show details for
+     */
+    private void showEpisodeDetails(Episode episode) {
+        if (getContext() == null) {
+            return;
+        }
+
+        // Build detailed information
+        StringBuilder details = new StringBuilder();
+
+        // Description (full, not truncated)
+        if (episode.getDescription() != null && !episode.getDescription().isEmpty()) {
+            // Parse HTML if present
+            CharSequence formattedDescription;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                formattedDescription = android.text.Html.fromHtml(episode.getDescription(), android.text.Html.FROM_HTML_MODE_COMPACT);
+            } else {
+                formattedDescription = android.text.Html.fromHtml(episode.getDescription());
+            }
+            details.append(formattedDescription.toString().trim()).append("\n\n");
+        }
+
+        // Published date
+        details.append(getString(R.string.episode_details_published,
+            formatTimestamp(episode.getPublishedAt()))).append("\n\n");
+
+        // Duration
+        if (episode.getDuration() > 0) {
+            details.append(getString(R.string.episode_details_duration,
+                formatDuration(episode.getDuration()))).append("\n\n");
+        } else {
+            details.append(getString(R.string.episode_details_duration,
+                getString(R.string.episode_details_unknown_duration))).append("\n\n");
+        }
+
+        // File size
+        if (episode.getEnclosureLength() > 0) {
+            details.append(getString(R.string.episode_details_file_size,
+                formatFileSize(episode.getEnclosureLength()))).append("\n\n");
+        }
+
+        // Episode state
+        details.append(getString(R.string.episode_details_state,
+            episode.getState().toString())).append("\n\n");
+
+        // Downloaded status
+        if (episode.isDownloaded()) {
+            details.append(getString(R.string.episode_details_downloaded,
+                formatTimestamp(episode.getDownloadedAt()))).append("\n");
+            if (episode.getDownloadPath() != null) {
+                details.append(getString(R.string.episode_details_download_path,
+                    episode.getDownloadPath())).append("\n\n");
+            }
+        } else {
+            details.append(getString(R.string.episode_details_not_downloaded)).append("\n\n");
+        }
+
+        // Chapters URL
+        if (episode.getChaptersUrl() != null && !episode.getChaptersUrl().isEmpty()) {
+            details.append(getString(R.string.episode_details_chapters_url,
+                episode.getChaptersUrl())).append("\n\n");
+        } else {
+            details.append(getString(R.string.episode_details_no_chapters)).append("\n\n");
+        }
+
+        // Media URL
+        if (episode.getEnclosureUrl() != null) {
+            details.append(getString(R.string.episode_details_enclosure_url,
+                episode.getEnclosureUrl())).append("\n\n");
+        }
+
+        // GUID
+        if (episode.getGuid() != null) {
+            details.append(getString(R.string.episode_details_guid,
+                episode.getGuid())).append("\n\n");
+        }
+
+        // Fetched date
+        details.append(getString(R.string.episode_details_fetched,
+            formatTimestamp(episode.getFetchedAt())));
+
+        // Show dialog with scrollable text
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle(getString(R.string.episode_details_title));
+        builder.setMessage(details.toString().trim());
+        builder.setPositiveButton(getString(R.string.dialog_close), null);
+        builder.show();
+    }
+
+    /**
+     * Format a timestamp (milliseconds) into a human-readable date/time string.
+     * @param timestamp The timestamp in milliseconds
+     * @return Formatted date/time string
+     */
+    private String formatTimestamp(long timestamp) {
+        if (timestamp <= 0) {
+            return "Unknown";
+        }
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MMM d, yyyy h:mm a", java.util.Locale.getDefault());
+        return sdf.format(new java.util.Date(timestamp));
+    }
+
+    /**
+     * Format a duration in seconds into a human-readable string.
+     * @param seconds Duration in seconds
+     * @return Formatted duration string (e.g., "1h 23m", "45m", "2h 15m 30s")
+     */
+    private String formatDuration(int seconds) {
+        if (seconds <= 0) {
+            return "0s";
+        }
+
+        int hours = seconds / 3600;
+        int minutes = (seconds % 3600) / 60;
+        int secs = seconds % 60;
+
+        StringBuilder duration = new StringBuilder();
+        if (hours > 0) {
+            duration.append(hours).append("h ");
+        }
+        if (minutes > 0) {
+            duration.append(minutes).append("m ");
+        }
+        if (secs > 0 || duration.length() == 0) {
+            duration.append(secs).append("s");
+        }
+
+        return duration.toString().trim();
+    }
+
+    /**
+     * Format a file size in bytes into a human-readable string.
+     * @param bytes File size in bytes
+     * @return Formatted file size string (e.g., "12.5 MB", "1.2 GB")
+     */
+    private String formatFileSize(long bytes) {
+        if (bytes <= 0) {
+            return "0 B";
+        }
+
+        final String[] units = new String[] { "B", "KB", "MB", "GB", "TB" };
+        int digitGroups = (int) (Math.log10(bytes) / Math.log10(1024));
+        digitGroups = Math.min(digitGroups, units.length - 1);
+
+        double size = bytes / Math.pow(1024, digitGroups);
+        return String.format(java.util.Locale.getDefault(), "%.1f %s", size, units[digitGroups]);
     }
 
     /**
@@ -857,6 +1016,7 @@ public class EpisodeListFragment extends Fragment {
                         );
                         episode.setDescription(rssItem.getDescription());
                         episode.setDuration(rssItem.getDuration());
+                        episode.setArtworkUrl(rssItem.getImageUrl());
                         episode.setState(EpisodeState.AVAILABLE);
                         episodes.add(episode);
                     }
