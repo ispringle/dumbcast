@@ -277,17 +277,19 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
         episodeTitleText.setText(currentEpisode.getTitle());
 
         // Clear artwork before loading new image to prevent showing previous episode's artwork
-        artworkImage.setImageDrawable(null);
-        artworkImage.setBackgroundColor(0);
+        if (artworkImage != null) {
+            artworkImage.setImageDrawable(null);
+            artworkImage.setBackgroundColor(0);
+        }
 
         // Load artwork with fallback: try episode artwork first, fall back to podcast artwork
         Podcast podcast = podcastRepository.getPodcastById(currentEpisode.getPodcastId());
-        if (podcast != null) {
+        if (podcast != null && artworkImage != null) {
             String episodeArtworkUrl = currentEpisode.getArtworkUrl();
             String podcastArtworkUrl = podcast.getArtworkUrl();
             ImageLoader.getInstance(getContext()).loadImageWithFallback(
                 getContext(), episodeArtworkUrl, podcastArtworkUrl, artworkImage);
-        } else {
+        } else if (artworkImage != null) {
             // No podcast found, show placeholder
             artworkImage.setBackgroundColor(0);
             artworkImage.setImageResource(R.drawable.ic_podcast_brain);
