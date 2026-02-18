@@ -290,24 +290,46 @@ public class DownloadService extends Service {
 
                 if (localUri != null) {
                     // Convert URI to file path
-                    String filePath = Uri.parse(localUri).getPath();
+                    // DIAGNOSTIC: Log the URI conversion
+                    Log.d(TAG, "Download complete URI conversion - LocalURI: " + localUri);
 
-                    // Update database - mark as downloaded
-                    long downloadedAt = System.currentTimeMillis();
-                    int updated = episodeRepository.updateEpisodeDownload(episodeId, filePath, downloadedAt);
+                    // Parse URI properly to get file path
+                    Uri uri = Uri.parse(localUri);
+                    String filePath;
 
-                    if (updated > 0) {
-                        // Move episode to BACKLOG state (downloaded episodes go to backlog)
-                        episodeRepository.updateEpisodeState(episodeId, EpisodeState.BACKLOG);
-
-                        Episode episode = episodeRepository.getEpisodeById(episodeId);
-                        if (episode != null) {
-                            showSuccessNotification(episode.getTitle());
-                            Log.d(TAG, "Download completed successfully: " + episode.getTitle());
-                        }
+                    // Handle file:// URIs correctly
+                    if ("file".equals(uri.getScheme())) {
+                        filePath = uri.getPath();
                     } else {
-                        Log.e(TAG, "Failed to update database for episode ID: " + episodeId);
-                        showErrorNotification("Download completed", "Failed to update database");
+                        // For other schemes (content://), use path as-is
+                        filePath = uri.toString();
+                    }
+
+                    Log.d(TAG, "Converted to FilePath: " + filePath);
+
+                    // Verify file actually exists before saving to database
+                    File file = new File(filePath);
+                    if (!file.exists()) {
+                        Log.e(TAG, "ERROR: Downloaded file does not exist at path: " + filePath);
+                        showErrorNotification("Download failed", "File not found at: " + filePath);
+                    } else {
+                        // Update database - mark as downloaded
+                        long downloadedAt = System.currentTimeMillis();
+                        int updated = episodeRepository.updateEpisodeDownload(episodeId, filePath, downloadedAt);
+
+                        if (updated > 0) {
+                            // Move episode to BACKLOG state (downloaded episodes go to backlog)
+                            episodeRepository.updateEpisodeState(episodeId, EpisodeState.BACKLOG);
+
+                            Episode episode = episodeRepository.getEpisodeById(episodeId);
+                            if (episode != null) {
+                                showSuccessNotification(episode.getTitle());
+                                Log.d(TAG, "Download completed successfully: " + episode.getTitle());
+                            }
+                        } else {
+                            Log.e(TAG, "Failed to update database for episode ID: " + episodeId);
+                            showErrorNotification("Download completed", "Failed to update database");
+                        }
                     }
                 } else {
                     Log.e(TAG, "Local URI is null for download ID: " + downloadId);

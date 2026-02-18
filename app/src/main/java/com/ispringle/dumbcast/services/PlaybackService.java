@@ -260,6 +260,19 @@ public class PlaybackService extends Service {
 
         try {
             mediaPlayer.reset();
+
+            // DIAGNOSTIC: Log audio URL being used
+            Log.d(TAG, "Setting data source - Downloaded: " + episode.isDownloaded() +
+                  ", URL: " + audioUrl);
+
+            // DIAGNOSTIC: If it's a local file path, check if file exists
+            if (episode.isDownloaded() && audioUrl != null && !audioUrl.startsWith("http")) {
+                java.io.File file = new java.io.File(audioUrl);
+                Log.d(TAG, "Local file check - Exists: " + file.exists() +
+                      ", CanRead: " + file.canRead() +
+                      ", Path: " + file.getAbsolutePath());
+            }
+
             mediaPlayer.setDataSource(audioUrl);
 
             // Restore playback position
