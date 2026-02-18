@@ -310,6 +310,11 @@ public class DiscoveryFragment extends Fragment {
         transaction.addToBackStack(null);
         transaction.commit();
 
+        // Notify MainActivity to update tab indicator
+        if (getActivity() instanceof com.ispringle.dumbcast.MainActivity) {
+            ((com.ispringle.dumbcast.MainActivity) getActivity()).onFragmentNavigated();
+        }
+
         Log.d(TAG, "Navigating to episode preview for: " + result.getTitle());
     }
 

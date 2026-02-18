@@ -199,6 +199,11 @@ public class SubscriptionsFragment extends Fragment {
         transaction.addToBackStack(null);
         transaction.commit();
 
+        // Notify MainActivity to update tab indicator
+        if (getActivity() instanceof com.ispringle.dumbcast.MainActivity) {
+            ((com.ispringle.dumbcast.MainActivity) getActivity()).onFragmentNavigated();
+        }
+
         Log.d(TAG, "Navigating to episode list for podcast: " + podcast.getTitle());
     }
 

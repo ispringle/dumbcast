@@ -5,6 +5,7 @@
     <string name="tab_subscriptions">Subscriptions</string>
     <string name="tab_discovery">Discovery</string>
     <string name="tab_now_playing">Now Playing</string>
+    <string name="tab_episodes">Episodes</string>
     <string name="subscriptions_title">Subscriptions</string>
     <string name="discovery_title">Discovery</string>
     <string name="search_hint">Search for podcasts</string>

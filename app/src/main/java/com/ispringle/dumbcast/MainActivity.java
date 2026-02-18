@@ -9,6 +9,7 @@ import android.os.IBinder;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.widget.TextView;
 
@@ -31,6 +32,8 @@ import com.ispringle.dumbcast.services.PlaybackService;
  * Implements keypad event handling for KaiOS devices.
  */
 public class MainActivity extends AppCompatActivity {
+
+    private static final String TAG = "MainActivity";
 
     private TextView tabIndicator;
     private EpisodeRepository episodeRepository;
@@ -101,6 +104,17 @@ public class MainActivity extends AppCompatActivity {
         tabIndicator = findViewById(R.id.tab_indicator);
         updateTabIndicator();
 
+        // Listen for back stack changes to update tab indicator
+        // This ensures header updates when user navigates back from EpisodeListFragment
+        getSupportFragmentManager().addOnBackStackChangedListener(new android.support.v4.app.FragmentManager.OnBackStackChangedListener() {
+            @Override
+            public void onBackStackChanged() {
+                Log.d(TAG, "onBackStackChanged: back stack count=" +
+                    getSupportFragmentManager().getBackStackEntryCount());
+                updateTabIndicator();
+            }
+        });
+
         // Set initial fragment if this is first creation
         // Only load if we're not checking playback state
         if (savedInstanceState == null && !isCheckingPlayback) {
@@ -164,6 +178,14 @@ public class MainActivity extends AppCompatActivity {
     };
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        // Update tab indicator when activity resumes
+        // This ensures it's correct after returning from background
+        updateTabIndicator();
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
 
@@ -203,10 +225,52 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * Update the tab indicator text to show current tab with arrows.
+     * Also checks the actual current fragment to handle cases where fragments
+     * navigate to sub-fragments (like EpisodeListFragment from SubscriptionsFragment).
      */
     private void updateTabIndicator() {
-        String tabName = getTabName(currentTab);
-        tabIndicator.setText("← " + tabName + " →");
+        // Check what fragment is actually showing
+        Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+
+        Log.d(TAG, "updateTabIndicator: currentTab=" + currentTab + ", currentFragment=" +
+            (currentFragment != null ? currentFragment.getClass().getSimpleName() : "null"));
+
+        String tabName;
+        if (currentFragment instanceof EpisodeListFragment) {
+            // If we're showing an episode list, check if it's a tab-level view or a drill-down
+            // Tab-level views: BACKLOG tab shows EpisodeListFragment for BACKLOG state
+            // Drill-down views: Clicking a podcast in Subscriptions/New shows EpisodeListFragment
+            if (currentTab == TAB_BACKLOG) {
+                // This is the BACKLOG tab view
+                tabName = getTabName(TAB_BACKLOG);
+                Log.d(TAG, "updateTabIndicator: showing BACKLOG tab (EpisodeListFragment)");
+            } else {
+                // This is a drill-down from another tab (Subscriptions or New)
+                // Show "Episodes" instead of the parent tab name
+                tabName = getString(R.string.tab_episodes);
+                Log.d(TAG, "updateTabIndicator: showing drill-down Episodes view");
+            }
+        } else if (currentFragment instanceof NewFragment) {
+            tabName = getTabName(TAB_NEW);
+            Log.d(TAG, "updateTabIndicator: showing New tab");
+        } else if (currentFragment instanceof SubscriptionsFragment) {
+            tabName = getTabName(TAB_SUBSCRIPTIONS);
+            Log.d(TAG, "updateTabIndicator: showing Subscriptions tab");
+        } else if (currentFragment instanceof DiscoveryFragment) {
+            tabName = getTabName(TAB_DISCOVER);
+            Log.d(TAG, "updateTabIndicator: showing Discovery tab");
+        } else if (currentFragment instanceof PlayerFragment) {
+            tabName = getTabName(TAB_NOW_PLAYING);
+            Log.d(TAG, "updateTabIndicator: showing Now Playing tab");
+        } else {
+            // Fallback to the stored currentTab value
+            tabName = getTabName(currentTab);
+            Log.d(TAG, "updateTabIndicator: fallback to stored currentTab");
+        }
+
+        String newText = "← " + tabName + " →";
+        tabIndicator.setText(newText);
+        Log.d(TAG, "updateTabIndicator: set header to: " + newText);
     }
 
     /**
@@ -223,6 +287,7 @@ public class MainActivity extends AppCompatActivity {
             currentTab = 0;
         }
 
+        Log.d(TAG, "navigateTab: direction=" + direction + ", newTab=" + currentTab);
         updateTabIndicator();
         loadFragmentForTab(currentTab);
     }
@@ -263,6 +328,31 @@ public class MainActivity extends AppCompatActivity {
         FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
         transaction.replace(R.id.fragment_container, fragment);
         transaction.commit();
+
+        // Update tab indicator after fragment is committed
+        // Post to handler to ensure fragment transaction completes first
+        tabIndicator.post(new Runnable() {
+            @Override
+            public void run() {
+                updateTabIndicator();
+            }
+        });
+    }
+
+    /**
+     * Public method for fragments to notify MainActivity that they've navigated.
+     * This ensures the tab indicator updates correctly.
+     * Call this after any FragmentTransaction that changes the displayed fragment.
+     */
+    public void onFragmentNavigated() {
+        Log.d(TAG, "onFragmentNavigated: called by fragment");
+        // Post to handler to ensure fragment transaction completes first
+        tabIndicator.post(new Runnable() {
+            @Override
+            public void run() {
+                updateTabIndicator();
+            }
+        });
     }
 
     /**
