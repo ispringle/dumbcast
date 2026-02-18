@@ -105,38 +105,44 @@ public class ImageLoader {
      * @param imageView ImageView to load image into
      */
     public void loadImageWithFallback(Context context, String primaryUrl, String fallbackUrl, ImageView imageView) {
-        // Determine which URL to use
-        String urlToLoad = null;
-
-        // Try primary URL first
-        if (primaryUrl != null && !primaryUrl.trim().isEmpty()) {
-            urlToLoad = primaryUrl;
-        } else if (fallbackUrl != null && !fallbackUrl.trim().isEmpty()) {
-            // Primary is null/empty, use fallback
-            urlToLoad = fallbackUrl;
-        }
-
         // Handle case where both URLs are null/empty
-        if (urlToLoad == null) {
+        if ((primaryUrl == null || primaryUrl.trim().isEmpty()) &&
+            (fallbackUrl == null || fallbackUrl.trim().isEmpty())) {
             setPlaceholder(context, imageView);
             return;
         }
 
-        // Check memory cache first
-        Bitmap cachedBitmap = memoryCache.get(urlToLoad);
-        if (cachedBitmap != null) {
-            Log.d(TAG, "Image loaded from memory cache: " + urlToLoad);
-            imageView.setImageBitmap(cachedBitmap);
-            imageView.setBackgroundColor(0); // Clear background
-            imageView.setTag(urlToLoad); // Mark which URL is displayed
-            return;
+        // Check memory cache for both URLs
+        // Try primary URL first
+        if (primaryUrl != null && !primaryUrl.trim().isEmpty()) {
+            Bitmap cachedBitmap = memoryCache.get(primaryUrl);
+            if (cachedBitmap != null) {
+                Log.d(TAG, "Image loaded from memory cache (primary): " + primaryUrl);
+                imageView.setImageBitmap(cachedBitmap);
+                imageView.setBackgroundColor(0); // Clear background
+                imageView.setTag(primaryUrl); // Mark which URL is displayed
+                return;
+            }
+        }
+
+        // Try fallback URL in cache
+        if (fallbackUrl != null && !fallbackUrl.trim().isEmpty()) {
+            Bitmap cachedBitmap = memoryCache.get(fallbackUrl);
+            if (cachedBitmap != null) {
+                Log.d(TAG, "Image loaded from memory cache (fallback): " + fallbackUrl);
+                imageView.setImageBitmap(cachedBitmap);
+                imageView.setBackgroundColor(0); // Clear background
+                imageView.setTag(fallbackUrl); // Mark which URL is displayed
+                return;
+            }
         }
 
         // Show placeholder while loading
         setPlaceholder(context, imageView);
 
-        // Set tag to track which URL is being loaded (prevents race conditions)
-        imageView.setTag(urlToLoad);
+        // Set tag to a composite key representing both URLs for race condition checking
+        String compositeKey = (primaryUrl != null ? primaryUrl : "") + "|" + (fallbackUrl != null ? fallbackUrl : "");
+        imageView.setTag(compositeKey);
 
         // Load image in background with fallback support
         new LoadImageTask(context, imageView, primaryUrl, fallbackUrl).execute();
@@ -435,11 +441,10 @@ public class ImageLoader {
                 return;
             }
 
-            // Check if ImageView is still waiting for this URL (race condition check)
-            // Determine which URL we attempted to load
-            String expectedUrl = (primaryUrl != null && !primaryUrl.trim().isEmpty()) ? primaryUrl : fallbackUrl;
+            // Check if ImageView is still waiting for this URL pair (race condition check)
+            String expectedCompositeKey = (primaryUrl != null ? primaryUrl : "") + "|" + (fallbackUrl != null ? fallbackUrl : "");
             Object tag = imageView.getTag();
-            if (tag == null || !tag.equals(expectedUrl)) {
+            if (tag == null || !tag.equals(expectedCompositeKey)) {
                 // ImageView is now being used for a different URL, don't set bitmap
                 Log.d(TAG, "ImageView tag mismatch, skipping update (race condition avoided)");
                 return;
