@@ -22,6 +22,7 @@ import com.ispringle.dumbcast.fragments.EpisodeListFragment;
 import com.ispringle.dumbcast.fragments.NewFragment;
 import com.ispringle.dumbcast.fragments.PlayerFragment;
 import com.ispringle.dumbcast.fragments.SubscriptionsFragment;
+import com.ispringle.dumbcast.services.DownloadService;
 import com.ispringle.dumbcast.services.PlaybackService;
 
 /**
@@ -91,6 +92,10 @@ public class MainActivity extends AppCompatActivity {
                 episodeRepository.fixDownloadedEpisodesState();
             }
         }).start();
+
+        // Recover orphaned downloads (files that exist but database doesn't know about)
+        // This handles cases where download completes but broadcast is missed
+        DownloadService.recoverOrphanedDownloads(this);
 
         // Setup tab indicator
         tabIndicator = findViewById(R.id.tab_indicator);

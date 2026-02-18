@@ -33,6 +33,7 @@ import java.lang.ref.WeakReference;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -437,7 +438,7 @@ public class DownloadService extends Service {
      * @param name The name to sanitize
      * @return Sanitized file name
      */
-    private String sanitizeFileName(String name) {
+    private static String sanitizeFileName(String name) {
         if (name == null || name.isEmpty()) {
             return "unknown";
         }
@@ -635,5 +636,150 @@ public class DownloadService extends Service {
         intent.setAction("ACTION_CANCEL_DOWNLOAD");
         intent.putExtra("episode_id", episodeId);
         context.startService(intent);
+    }
+
+    /**
+     * Scan for orphaned downloaded files and update database.
+     * This handles cases where download completes but the broadcast is missed.
+     * Should be called on app startup to recover from interrupted downloads.
+     *
+     * @param context Application context
+     */
+    public static void recoverOrphanedDownloads(final Context context) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Log.d(TAG, "Starting orphaned download recovery scan");
+
+                    DatabaseHelper dbHelper = DatabaseManager.getInstance(context);
+                    EpisodeRepository episodeRepository = new EpisodeRepository(dbHelper);
+                    PodcastRepository podcastRepository = new PodcastRepository(dbHelper);
+
+                    File podcastsDir = context.getExternalFilesDir(Environment.DIRECTORY_PODCASTS);
+                    if (podcastsDir == null || !podcastsDir.exists()) {
+                        Log.d(TAG, "No podcasts directory found, nothing to recover");
+                        return;
+                    }
+
+                    int recoveredCount = 0;
+                    int verifiedCount = 0;
+
+                    // Iterate through podcast directories
+                    File[] podcastDirs = podcastsDir.listFiles();
+                    if (podcastDirs == null) {
+                        Log.d(TAG, "Podcasts directory is empty");
+                        return;
+                    }
+
+                    for (File podcastDir : podcastDirs) {
+                        if (!podcastDir.isDirectory()) {
+                            continue;
+                        }
+
+                        String sanitizedPodcastName = podcastDir.getName();
+
+                        // Get all podcasts and find matching podcast by sanitized name
+                        List<Podcast> allPodcasts = podcastRepository.getAllPodcasts();
+                        Podcast matchingPodcast = null;
+
+                        for (Podcast podcast : allPodcasts) {
+                            if (sanitizeFileName(podcast.getTitle()).equals(sanitizedPodcastName)) {
+                                matchingPodcast = podcast;
+                                break;
+                            }
+                        }
+
+                        if (matchingPodcast == null) {
+                            Log.w(TAG, "Found orphaned podcast directory (no matching podcast in DB): " + sanitizedPodcastName);
+                            continue;
+                        }
+
+                        // Get all episodes for this podcast
+                        List<Episode> episodes = episodeRepository.getEpisodesByPodcast(matchingPodcast.getId());
+
+                        // Scan episode files in this podcast directory
+                        File[] episodeFiles = podcastDir.listFiles();
+                        if (episodeFiles == null) {
+                            continue;
+                        }
+
+                        for (File episodeFile : episodeFiles) {
+                            if (!episodeFile.isFile()) {
+                                continue;
+                            }
+
+                            String fileName = episodeFile.getName();
+                            String filePath = episodeFile.getAbsolutePath();
+
+                            // Try to match file to an episode
+                            Episode matchedEpisode = null;
+
+                            // First, check if any episode already has this exact download path
+                            for (Episode episode : episodes) {
+                                if (filePath.equals(episode.getDownloadPath())) {
+                                    // Episode already knows about this file
+                                    verifiedCount++;
+                                    matchedEpisode = episode;
+                                    break;
+                                }
+                            }
+
+                            if (matchedEpisode != null) {
+                                continue; // Already tracked in database
+                            }
+
+                            // File exists but no episode claims it - try to match by filename
+                            String fileNameWithoutExt = fileName;
+                            int lastDotIndex = fileName.lastIndexOf('.');
+                            if (lastDotIndex > 0) {
+                                fileNameWithoutExt = fileName.substring(0, lastDotIndex);
+                            }
+
+                            // Find episode with matching sanitized title
+                            for (Episode episode : episodes) {
+                                String sanitizedEpisodeTitle = sanitizeFileName(episode.getTitle());
+
+                                if (sanitizedEpisodeTitle.equals(fileNameWithoutExt)) {
+                                    // Check if file actually exists (defensive check)
+                                    if (episodeFile.exists() && episodeFile.length() > 0) {
+                                        // Only update if episode doesn't already have a download path
+                                        if (episode.getDownloadPath() == null || episode.getDownloadPath().isEmpty()) {
+                                            // Update database to mark as downloaded
+                                            long downloadedAt = episodeFile.lastModified();
+                                            int updated = episodeRepository.updateEpisodeDownload(
+                                                episode.getId(),
+                                                filePath,
+                                                downloadedAt
+                                            );
+
+                                            if (updated > 0) {
+                                                // Move to BACKLOG state
+                                                episodeRepository.updateEpisodeState(episode.getId(), EpisodeState.BACKLOG);
+                                                recoveredCount++;
+                                                Log.d(TAG, "Recovered orphaned download: " + episode.getTitle() +
+                                                      " (File: " + filePath + ")");
+                                            }
+                                        }
+                                    }
+                                    matchedEpisode = episode;
+                                    break;
+                                }
+                            }
+
+                            if (matchedEpisode == null) {
+                                Log.w(TAG, "Found orphaned file with no matching episode: " + filePath);
+                            }
+                        }
+                    }
+
+                    Log.d(TAG, "Download recovery complete. Recovered: " + recoveredCount +
+                          ", Verified: " + verifiedCount);
+
+                } catch (Exception e) {
+                    Log.e(TAG, "Error during orphaned download recovery", e);
+                }
+            }
+        }).start();
     }
 }
