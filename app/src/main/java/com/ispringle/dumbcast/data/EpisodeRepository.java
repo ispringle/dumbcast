@@ -172,6 +172,26 @@ public class EpisodeRepository {
     }
 
     /**
+     * Update the description for an episode.
+     * Used when fetching show notes for downloaded episodes.
+     * @param id The episode ID
+     * @param description The episode description/show notes
+     * @return The number of rows affected
+     */
+    public int updateEpisodeDescription(long id, String description) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(DatabaseHelper.COL_EPISODE_DESCRIPTION, description);
+
+        return db.update(
+            DatabaseHelper.TABLE_EPISODES,
+            values,
+            DatabaseHelper.COL_EPISODE_ID + " = ?",
+            new String[]{String.valueOf(id)}
+        );
+    }
+
+    /**
      * Delete an episode's download and update its state appropriately.
      * If the episode is in BACKLOG state, it will be moved to AVAILABLE.
      * This ensures deleted episodes are removed from the backlog view.

@@ -27,9 +27,14 @@ import com.ispringle.dumbcast.data.EpisodeRepository;
 import com.ispringle.dumbcast.data.EpisodeState;
 import com.ispringle.dumbcast.data.Podcast;
 import com.ispringle.dumbcast.data.PodcastRepository;
+import com.ispringle.dumbcast.utils.RssFeed;
+import com.ispringle.dumbcast.utils.RssParser;
+
+import org.xmlpull.v1.XmlPullParserException;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.ref.WeakReference;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -325,6 +330,9 @@ public class DownloadService extends Service {
 
                             Episode episode = episodeRepository.getEpisodeById(episodeId);
                             if (episode != null) {
+                                // Fetch and save description from RSS feed
+                                fetchAndSaveDescription(episode);
+
                                 showSuccessNotification(episode.getTitle());
                                 Log.d(TAG, "Download completed successfully: " + episode.getTitle());
                             }
@@ -647,6 +655,146 @@ public class DownloadService extends Service {
         intent.setAction("ACTION_CANCEL_DOWNLOAD");
         intent.putExtra("episode_id", episodeId);
         context.startService(intent);
+    }
+
+    /**
+     * Fetch episode description from RSS feed and save to database.
+     * This is called after an episode is successfully downloaded.
+     * If RSS is unavailable or episode not found, description remains null (non-critical failure).
+     *
+     * @param episode The episode to fetch description for
+     */
+    private void fetchAndSaveDescription(Episode episode) {
+        // Run on background thread to avoid blocking
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Log.d(TAG, "Fetching description for downloaded episode: " + episode.getTitle());
+
+                    // Get podcast to retrieve RSS feed URL
+                    Podcast podcast = podcastRepository.getPodcastById(episode.getPodcastId());
+                    if (podcast == null) {
+                        Log.w(TAG, "Cannot fetch description: Podcast not found (ID: " + episode.getPodcastId() + ")");
+                        return;
+                    }
+
+                    // Fetch and parse RSS feed
+                    RssFeed feed = fetchRssFeed(podcast.getFeedUrl());
+                    if (feed == null) {
+                        Log.w(TAG, "Cannot fetch description: RSS feed unavailable for " + podcast.getTitle());
+                        return;
+                    }
+
+                    // Find matching episode in feed by GUID
+                    String description = null;
+                    for (RssFeed.RssItem item : feed.getItems()) {
+                        // Match by GUID (accounting for generated GUIDs)
+                        String itemGuid = item.getGuid();
+                        if (itemGuid == null || itemGuid.trim().isEmpty()) {
+                            // Generate GUID same way as insertEpisodesFromFeed
+                            if (item.getEnclosureUrl() != null && !item.getEnclosureUrl().trim().isEmpty()) {
+                                itemGuid = "url:" + item.getEnclosureUrl();
+                            } else if (item.getPublishedAt() > 0) {
+                                itemGuid = "title-date:" + item.getTitle() + ":" + item.getPublishedAt();
+                            } else {
+                                itemGuid = "title:" + item.getTitle();
+                            }
+                        }
+
+                        if (itemGuid.equals(episode.getGuid())) {
+                            description = item.getBestDescription();
+                            break;
+                        }
+                    }
+
+                    if (description != null && !description.trim().isEmpty()) {
+                        // Save description to database
+                        int updated = episodeRepository.updateEpisodeDescription(episode.getId(), description);
+                        if (updated > 0) {
+                            Log.d(TAG, "Successfully saved description for episode: " + episode.getTitle());
+                        } else {
+                            Log.w(TAG, "Failed to save description for episode: " + episode.getTitle());
+                        }
+                    } else {
+                        Log.w(TAG, "No description found in RSS feed for episode: " + episode.getTitle());
+                    }
+
+                } catch (Exception e) {
+                    // Non-critical failure - episode is downloaded, just missing description
+                    Log.w(TAG, "Failed to fetch description for episode: " + episode.getTitle(), e);
+                }
+            }
+        }).start();
+    }
+
+    /**
+     * Fetch RSS feed from URL with redirect handling.
+     * Returns null if fetch fails (non-critical - description fetch is optional).
+     *
+     * @param feedUrl The RSS feed URL
+     * @return Parsed RssFeed object, or null if fetch/parse fails
+     */
+    private RssFeed fetchRssFeed(String feedUrl) {
+        return fetchRssFeedWithRedirects(feedUrl, 5);
+    }
+
+    /**
+     * Fetch RSS feed with manual redirect following.
+     * Returns null if fetch fails.
+     *
+     * @param feedUrl The RSS feed URL
+     * @param maxRedirects Maximum number of redirects to follow
+     * @return Parsed RssFeed object, or null if fetch/parse fails
+     */
+    private RssFeed fetchRssFeedWithRedirects(String feedUrl, int maxRedirects) {
+        if (maxRedirects <= 0) {
+            Log.w(TAG, "Too many redirects for RSS feed: " + feedUrl);
+            return null;
+        }
+
+        HttpURLConnection connection = null;
+        try {
+            URL url = new URL(feedUrl);
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(15000);
+            connection.setReadTimeout(15000);
+            connection.setRequestProperty("User-Agent", "Dumbcast/1.0");
+            connection.setInstanceFollowRedirects(false);
+
+            int responseCode = connection.getResponseCode();
+
+            // Handle redirects (301, 302, 303, 307, 308)
+            if (responseCode >= 300 && responseCode < 400) {
+                String newUrl = connection.getHeaderField("Location");
+                if (newUrl == null) {
+                    Log.w(TAG, "Redirect with no Location header for: " + feedUrl);
+                    return null;
+                }
+
+                Log.d(TAG, "Following redirect: " + feedUrl + " -> " + newUrl);
+                connection.disconnect();
+                return fetchRssFeedWithRedirects(newUrl, maxRedirects - 1);
+            }
+
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                Log.w(TAG, "HTTP error code " + responseCode + " for RSS feed: " + feedUrl);
+                return null;
+            }
+
+            InputStream inputStream = connection.getInputStream();
+            RssParser parser = new RssParser();
+            return parser.parse(inputStream);
+
+        } catch (IOException | XmlPullParserException e) {
+            Log.w(TAG, "Failed to fetch RSS feed: " + feedUrl, e);
+            return null;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
     }
 
     /**

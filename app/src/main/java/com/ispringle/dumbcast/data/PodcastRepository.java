@@ -545,19 +545,17 @@ public class PodcastRepository {
 
                 if (isInitialSubscription) {
                     // Initial subscription: Give session grace (old episodes won't bug you)
-                    // No description stored (saves ~5-10KB per episode)
+                    // No description stored - descriptions only saved when episode is downloaded
                     // Set to AVAILABLE instead of NEW to avoid overwhelming user
                     episode.setSessionGrace(true);
                     episode.setState(EpisodeState.AVAILABLE);
                 } else {
-                    // Subsequent refresh: Recent episodes are NEW with description
+                    // Subsequent refresh: No descriptions stored during refresh
+                    // Descriptions are only saved when episode is downloaded
                     if (isOldEpisode) {
                         episode.setSessionGrace(true);
-                    } else {
-                        // Store best description for NEW episodes (likely to be read soon)
-                        // Priority: content:encoded > itunes:summary > description
-                        episode.setDescription(item.getBestDescription());
                     }
+                    // Description remains null - will be fetched on download
                 }
 
                 // Insert episode
