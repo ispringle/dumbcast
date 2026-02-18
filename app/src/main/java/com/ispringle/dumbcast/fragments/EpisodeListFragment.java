@@ -706,8 +706,8 @@ public class EpisodeListFragment extends Fragment {
                 }
             }
 
-            // Update database to clear download info
-            int rowsUpdated = repository.updateEpisodeDownload(episode.getId(), null, 0);
+            // Update database to clear download info and update state if needed
+            int rowsUpdated = repository.deleteEpisodeDownloadAndUpdateState(episode.getId(), downloadPath);
             return rowsUpdated > 0;
         }
 

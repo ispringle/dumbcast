@@ -172,6 +172,44 @@ public class EpisodeRepository {
     }
 
     /**
+     * Delete an episode's download and update its state appropriately.
+     * If the episode is in BACKLOG state, it will be moved to AVAILABLE.
+     * This ensures deleted episodes are removed from the backlog view.
+     * @param id The episode ID
+     * @param downloadPath The download path to delete (for verification)
+     * @return The number of rows affected
+     */
+    public int deleteEpisodeDownloadAndUpdateState(long id, String downloadPath) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+
+        // First get the current episode to check its state
+        Episode episode = getEpisodeById(id);
+        if (episode == null) {
+            Log.w(TAG, "Cannot delete download: Episode not found (ID: " + id + ")");
+            return 0;
+        }
+
+        ContentValues values = new ContentValues();
+        values.put(DatabaseHelper.COL_EPISODE_DOWNLOAD_PATH, (String) null);
+        values.put(DatabaseHelper.COL_EPISODE_DOWNLOADED_AT, 0);
+
+        // If episode is in BACKLOG state, move it to AVAILABLE
+        // This removes it from the backlog view when deleted
+        if (episode.getState() == EpisodeState.BACKLOG) {
+            values.put(DatabaseHelper.COL_EPISODE_STATE, EpisodeState.AVAILABLE.name());
+            values.put(DatabaseHelper.COL_EPISODE_VIEWED_AT, System.currentTimeMillis());
+            Log.d(TAG, "Moving episode from BACKLOG to AVAILABLE after deletion: " + id);
+        }
+
+        return db.update(
+            DatabaseHelper.TABLE_EPISODES,
+            values,
+            DatabaseHelper.COL_EPISODE_ID + " = ?",
+            new String[]{String.valueOf(id)}
+        );
+    }
+
+    /**
      * Update the playback position for an episode.
      * This is called frequently during playback, so it only updates the position column.
      * @param id The episode ID
