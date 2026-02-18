@@ -568,6 +568,10 @@ public class SubscriptionsFragment extends Fragment {
                         Toast.makeText(fragment.getContext(), message, Toast.LENGTH_SHORT).show();
                         // Refresh the podcast list to update episode counts
                         fragment.loadPodcasts();
+                        // Update tab visibility in MainActivity (new episodes may have been added)
+                        if (fragment.getActivity() instanceof com.ispringle.dumbcast.MainActivity) {
+                            ((com.ispringle.dumbcast.MainActivity) fragment.getActivity()).updateTabVisibility();
+                        }
                     } else {
                         Toast.makeText(fragment.getContext(), R.string.toast_refresh_no_new, Toast.LENGTH_SHORT).show();
                     }
@@ -714,6 +718,10 @@ public class SubscriptionsFragment extends Fragment {
             // Refresh the podcast list to update episode counts
             if (result.totalNewEpisodes > 0) {
                 fragment.loadPodcasts();
+                // Update tab visibility in MainActivity (new episodes may have been added)
+                if (fragment.getActivity() instanceof com.ispringle.dumbcast.MainActivity) {
+                    ((com.ispringle.dumbcast.MainActivity) fragment.getActivity()).updateTabVisibility();
+                }
             }
         }
     }

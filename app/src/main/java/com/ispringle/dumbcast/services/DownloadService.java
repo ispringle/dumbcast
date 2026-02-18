@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.support.v4.content.LocalBroadcastManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
@@ -52,6 +53,9 @@ public class DownloadService extends Service {
     private static final String TAG = "DownloadService";
     private static final String PREFS_NAME = "download_prefs";
     private static final String CHANNEL_ID = "download_channel";
+
+    // Broadcast action for episode state changes
+    public static final String ACTION_EPISODE_STATE_CHANGED = "com.ispringle.dumbcast.EPISODE_STATE_CHANGED";
 
     private DownloadManager downloadManager;
     private EpisodeRepository episodeRepository;
@@ -335,6 +339,10 @@ public class DownloadService extends Service {
 
                                 showSuccessNotification(episode.getTitle());
                                 Log.d(TAG, "Download completed successfully: " + episode.getTitle());
+
+                                // Broadcast episode state change to update MainActivity tabs
+                                Intent broadcast = new Intent(ACTION_EPISODE_STATE_CHANGED);
+                                LocalBroadcastManager.getInstance(this).sendBroadcast(broadcast);
                             }
                         } else {
                             Log.e(TAG, "Failed to update database for episode ID: " + episodeId);

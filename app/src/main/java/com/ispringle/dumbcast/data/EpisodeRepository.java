@@ -407,6 +407,30 @@ public class EpisodeRepository {
     }
 
     /**
+     * Get the count of episodes with a specific state.
+     * @param state The episode state to filter by
+     * @return The number of episodes in the specified state
+     */
+    public int getEpisodeCountByState(EpisodeState state) {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        Cursor cursor = db.rawQuery(
+            "SELECT COUNT(*) FROM " + DatabaseHelper.TABLE_EPISODES +
+            " WHERE " + DatabaseHelper.COL_EPISODE_STATE + " = ?",
+            new String[]{state.name()}
+        );
+
+        int count = 0;
+        if (cursor != null) {
+            if (cursor.moveToFirst()) {
+                count = cursor.getInt(0);
+            }
+            cursor.close();
+        }
+
+        return count;
+    }
+
+    /**
      * Check if an episode with the given GUID already exists for a podcast.
      * @param podcastId The podcast ID
      * @param guid The episode GUID

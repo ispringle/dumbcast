@@ -863,6 +863,10 @@ public class EpisodeListFragment extends Fragment {
                     Toast.makeText(fragment.getContext(), R.string.toast_saved_to_backlog, Toast.LENGTH_SHORT).show();
                     // Refresh the list
                     fragment.loadEpisodes();
+                    // Update tab visibility in MainActivity
+                    if (fragment.getActivity() instanceof MainActivity) {
+                        ((MainActivity) fragment.getActivity()).updateTabVisibility();
+                    }
                 } else {
                     Toast.makeText(fragment.getContext(), R.string.toast_failed_save_backlog, Toast.LENGTH_SHORT).show();
                 }
@@ -911,6 +915,10 @@ public class EpisodeListFragment extends Fragment {
                     Toast.makeText(fragment.getContext(), R.string.toast_download_deleted, Toast.LENGTH_SHORT).show();
                     // Refresh the list
                     fragment.loadEpisodes();
+                    // Update tab visibility in MainActivity
+                    if (fragment.getActivity() instanceof MainActivity) {
+                        ((MainActivity) fragment.getActivity()).updateTabVisibility();
+                    }
                 } else {
                     Toast.makeText(fragment.getContext(), R.string.toast_failed_delete_download, Toast.LENGTH_SHORT).show();
                 }
@@ -945,6 +953,10 @@ public class EpisodeListFragment extends Fragment {
                     Toast.makeText(fragment.getContext(), R.string.toast_marked_viewed, Toast.LENGTH_SHORT).show();
                     // Refresh the list
                     fragment.loadEpisodes();
+                    // Update tab visibility in MainActivity
+                    if (fragment.getActivity() instanceof MainActivity) {
+                        ((MainActivity) fragment.getActivity()).updateTabVisibility();
+                    }
                 } else {
                     Toast.makeText(fragment.getContext(), R.string.toast_failed_update_episode, Toast.LENGTH_SHORT).show();
                 }
@@ -979,6 +991,10 @@ public class EpisodeListFragment extends Fragment {
                     Toast.makeText(fragment.getContext(), R.string.toast_removed_from_backlog, Toast.LENGTH_SHORT).show();
                     // Refresh the list
                     fragment.loadEpisodes();
+                    // Update tab visibility in MainActivity
+                    if (fragment.getActivity() instanceof MainActivity) {
+                        ((MainActivity) fragment.getActivity()).updateTabVisibility();
+                    }
                 } else {
                     Toast.makeText(fragment.getContext(), R.string.toast_failed_update_episode, Toast.LENGTH_SHORT).show();
                 }
