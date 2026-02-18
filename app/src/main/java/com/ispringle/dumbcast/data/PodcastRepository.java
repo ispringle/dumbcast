@@ -409,7 +409,16 @@ public class PodcastRepository {
         int consecutiveDuplicates = 0;
         final int DUPLICATE_THRESHOLD = 10; // Stop after 10 consecutive duplicates
 
-        Log.d(TAG, "Processing " + feed.getItems().size() + " items from feed for podcast ID: " + podcastId + " (max new: " + maxNewEpisodes + ")");
+        // Get last refresh timestamp for timestamp-based filtering on refreshes
+        long lastRefreshAt = 0;
+        if (!isInitialSubscription) {
+            Podcast podcast = getPodcastById(podcastId);
+            if (podcast != null) {
+                lastRefreshAt = podcast.getLastRefreshAt();
+            }
+        }
+
+        Log.d(TAG, "Processing " + feed.getItems().size() + " items from feed for podcast ID: " + podcastId + " (max new: " + maxNewEpisodes + ", lastRefresh: " + lastRefreshAt + ")");
 
         db.beginTransaction();
         try {
@@ -425,6 +434,14 @@ public class PodcastRepository {
                 if (maxNewEpisodes > 0 && newEpisodeCount >= maxNewEpisodes) {
                     Log.d(TAG, "Stopping: reached maximum new episodes limit of " + maxNewEpisodes);
                     break;
+                }
+
+                // For refreshes (not initial subscription), skip episodes published before last refresh
+                // This prevents processing hundreds of old episodes when only checking for new ones
+                if (!isInitialSubscription && lastRefreshAt > 0 && item.getPublishedAt() > 0 && item.getPublishedAt() < lastRefreshAt) {
+                    Log.d(TAG, "Skipping old episode (published before last refresh): " + item.getTitle());
+                    skippedCount++;
+                    continue;
                 }
                 // Only require title - GUID and enclosureUrl are now optional
                 if (item.getTitle() == null || item.getTitle().trim().isEmpty()) {
