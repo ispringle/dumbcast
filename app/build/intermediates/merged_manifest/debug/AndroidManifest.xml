@@ -39,14 +39,6 @@
             android:name="com.ispringle.dumbcast.services.DownloadService"
             android:enabled="true"
             android:exported="false" />
-
-        <receiver
-            android:name="com.ispringle.dumbcast.services.DownloadService$DownloadCompleteReceiver"
-            android:exported="false" >
-            <intent-filter>
-                <action android:name="android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE" />
-            </intent-filter>
-        </receiver>
     </application>
 
 </manifest>

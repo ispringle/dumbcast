@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="8dp"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:gravity="center_horizontal">
+
+    <!-- Episode Title -->
+    <TextView
+        android:id="@+id/player_episode_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/no_episode_loaded"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:singleLine="true"
+        android:ellipsize="marquee"
+        android:marqueeRepeatLimit="marquee_forever"
+        android:scrollHorizontally="true"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:paddingBottom="8dp" />
+
+    <!-- Episode/Podcast Image -->
+    <ImageView
+        android:id="@+id/player_artwork"
+        android:layout_width="150dp"
+        android:layout_height="150dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="8dp"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_podcast_brain"
+        android:contentDescription="@string/artwork_description" />
+
+    <!-- Progress Container: Time + Progress Bar + Time -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="8dp">
+
+        <!-- Elapsed Time -->
+        <TextView
+            android:id="@+id/player_elapsed_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0:00"
+            android:textSize="12sp"
+            android:paddingEnd="8dp"
+            android:paddingRight="8dp" />
+
+        <!-- Progress Bar -->
+        <ProgressBar
+            android:id="@+id/player_progress_bar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:max="100"
+            android:progress="0" />
+
+        <!-- Total Time -->
+        <TextView
+            android:id="@+id/player_total_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0:00"
+            android:textSize="12sp"
+            android:paddingStart="8dp"
+            android:paddingLeft="8dp" />
+
+    </LinearLayout>
+
+    <!-- Combined Time Display (hidden, kept for backward compatibility) -->
+    <TextView
+        android:id="@+id/player_progress_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/time_default"
+        android:textSize="12sp"
+        android:gravity="center"
+        android:visibility="gone" />
+
+    <!-- Play/Pause Button -->
+    <TextView
+        android:id="@+id/player_play_pause"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:text=""
+        android:gravity="center"
+        android:padding="16dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?android:attr/selectableItemBackground" />
+
+    <!-- Current chapter (initially hidden, kept for future use) -->
+    <TextView
+        android:id="@+id/player_chapter_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textSize="12sp"
+        android:textColor="?android:attr/textColorSecondary"
+        android:gravity="center"
+        android:paddingTop="16dp"
+        android:visibility="gone" />
+
+    <!-- Status message -->
+    <TextView
+        android:id="@+id/player_status_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textSize="14sp"
+        android:textColor="?android:attr/textColorSecondary"
+        android:gravity="center"
+        android:paddingTop="16dp"
+        android:visibility="gone" />
+
+</LinearLayout>

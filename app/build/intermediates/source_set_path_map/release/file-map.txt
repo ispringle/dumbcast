@@ -1,0 +1,14 @@
+com.ispringle.dumbcast.app-recyclerview-v7-27.1.1-0 /Users/IPringle/.gradle/caches/transforms-3/4276e0212eb305e659a0451530cc5ef1/transformed/recyclerview-v7-27.1.1/res
+com.ispringle.dumbcast.app-appcompat-v7-27.1.1-1 /Users/IPringle/.gradle/caches/transforms-3/49deed55f71244dd13e82bae1d348128/transformed/appcompat-v7-27.1.1/res
+com.ispringle.dumbcast.app-support-core-ui-27.1.1-2 /Users/IPringle/.gradle/caches/transforms-3/8ca95fa2647995c86b60fdd9e4f3b85a/transformed/support-core-ui-27.1.1/res
+com.ispringle.dumbcast.app-support-media-compat-27.1.1-3 /Users/IPringle/.gradle/caches/transforms-3/944a446b3ce89faffe835647d2f98296/transformed/support-media-compat-27.1.1/res
+com.ispringle.dumbcast.app-transition-27.1.1-4 /Users/IPringle/.gradle/caches/transforms-3/abc66ecae524fedd1897373704b7dbd4/transformed/transition-27.1.1/res
+com.ispringle.dumbcast.app-support-compat-27.1.1-5 /Users/IPringle/.gradle/caches/transforms-3/ad1fbcd79dd0bb6a7d567ac357395820/transformed/support-compat-27.1.1/res
+com.ispringle.dumbcast.app-design-27.1.1-6 /Users/IPringle/.gradle/caches/transforms-3/e4fc017e9edf6861e98369e324547e4f/transformed/design-27.1.1/res
+com.ispringle.dumbcast.app-pngs-7 /Users/IPringle/git/hub/ispringle/dumbcast/app/build/generated/res/pngs/release
+com.ispringle.dumbcast.app-resValues-8 /Users/IPringle/git/hub/ispringle/dumbcast/app/build/generated/res/resValues/release
+com.ispringle.dumbcast.app-packageReleaseResources-9 /Users/IPringle/git/hub/ispringle/dumbcast/app/build/intermediates/incremental/release/packageReleaseResources/merged.dir
+com.ispringle.dumbcast.app-packageReleaseResources-10 /Users/IPringle/git/hub/ispringle/dumbcast/app/build/intermediates/incremental/release/packageReleaseResources/stripped.dir
+com.ispringle.dumbcast.app-merged_res-11 /Users/IPringle/git/hub/ispringle/dumbcast/app/build/intermediates/merged_res/release
+com.ispringle.dumbcast.app-main-12 /Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/res
+com.ispringle.dumbcast.app-release-13 /Users/IPringle/git/hub/ispringle/dumbcast/app/src/release/res

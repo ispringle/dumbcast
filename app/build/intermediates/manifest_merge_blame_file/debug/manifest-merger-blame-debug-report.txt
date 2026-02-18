@@ -25,7 +25,7 @@
 15-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:9:22-65
 16
 17    <application
-17-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:11:5-44:19
+17-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:11:5-36:19
 18        android:allowBackup="true"
 18-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:12:9-35
 19        android:debuggable="true"
@@ -70,20 +70,6 @@
 40-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:33:13-35
 41            android:exported="false" />
 41-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:34:13-37
-42
-43        <receiver
-43-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:36:9-42:20
-44            android:name="com.ispringle.dumbcast.services.DownloadService$DownloadCompleteReceiver"
-44-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:37:13-78
-45            android:exported="false" >
-45-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:38:13-37
-46            <intent-filter>
-46-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:39:13-41:29
-47                <action android:name="android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE" />
-47-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:40:17-95
-47-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:40:25-92
-48            </intent-filter>
-49        </receiver>
-50    </application>
-51
-52</manifest>
+42    </application>
+43
+44</manifest>

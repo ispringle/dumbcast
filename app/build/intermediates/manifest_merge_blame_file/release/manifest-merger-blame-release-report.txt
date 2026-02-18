@@ -1,0 +1,74 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.ispringle.dumbcast"
+4    android:versionCode="1"
+5    android:versionName="0.1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="27"
+9        android:targetSdkVersion="27" />
+10
+11    <uses-permission android:name="android.permission.INTERNET" />
+11-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:5:5-67
+11-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:5:22-64
+12    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+12-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:6:5-81
+12-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:6:22-78
+13    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+13-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:7:5-80
+13-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:7:22-77
+14    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+14-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:8:5-77
+14-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:8:22-74
+15    <uses-permission android:name="android.permission.WAKE_LOCK" />
+15-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:9:5-68
+15-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:9:22-65
+16
+17    <application
+17-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:11:5-36:19
+18        android:allowBackup="true"
+18-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:12:9-35
+19        android:extractNativeLibs="false"
+20        android:icon="@mipmap/ic_launcher"
+20-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:13:9-43
+21        android:label="@string/app_name"
+21-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:14:9-41
+22        android:theme="@style/AppTheme" >
+22-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:15:9-40
+23        <activity
+23-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:17:9-24:20
+24            android:name="com.ispringle.dumbcast.MainActivity"
+24-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:18:13-41
+25            android:label="@string/app_name" >
+25-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:19:13-45
+26            <intent-filter>
+26-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:20:13-23:29
+27                <action android:name="android.intent.action.MAIN" />
+27-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:21:17-69
+27-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:21:25-66
+28
+29                <category android:name="android.intent.category.LAUNCHER" />
+29-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:22:17-77
+29-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:22:27-74
+30            </intent-filter>
+31        </activity>
+32
+33        <service
+33-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:26:9-29:40
+34            android:name="com.ispringle.dumbcast.services.PlaybackService"
+34-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:27:13-53
+35            android:enabled="true"
+35-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:28:13-35
+36            android:exported="false" />
+36-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:29:13-37
+37        <service
+37-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:31:9-34:40
+38            android:name="com.ispringle.dumbcast.services.DownloadService"
+38-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:32:13-53
+39            android:enabled="true"
+39-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:33:13-35
+40            android:exported="false" />
+40-->/Users/IPringle/git/hub/ispringle/dumbcast/app/src/main/AndroidManifest.xml:34:13-37
+41    </application>
+42
+43</manifest>

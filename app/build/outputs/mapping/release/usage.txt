@@ -1,0 +1,666 @@
+android.arch.core.BuildConfig
+android.arch.core.R
+android.arch.core.executor.ArchTaskExecutor:
+    public static java.util.concurrent.Executor getIOThreadExecutor()
+    public static java.util.concurrent.Executor getMainThreadExecutor()
+    public void setDelegate(android.arch.core.executor.TaskExecutor)
+android.arch.core.executor.TaskExecutor:
+    public void executeOnMainThread(java.lang.Runnable)
+android.arch.core.util.Function
+android.arch.lifecycle.AndroidViewModel:
+    private android.app.Application mApplication
+    public void <init>(android.app.Application)
+    public android.app.Application getApplication()
+android.arch.lifecycle.BuildConfig
+android.arch.lifecycle.ClassesInfoCache:
+    private static final int CALL_TYPE_NO_ARG
+    private static final int CALL_TYPE_PROVIDER
+    private static final int CALL_TYPE_PROVIDER_WITH_EVENT
+android.arch.lifecycle.LifecycleRegistry:
+    private static final java.lang.String LOG_TAG
+    public int getObserverCount()
+android.arch.lifecycle.Lifecycling:
+    private static final int GENERATED_CALLBACK
+    private static final int REFLECTIVE_CALLBACK
+    public void <init>()
+android.arch.lifecycle.MethodCallsLogger:
+    public boolean approveCall(java.lang.String,int)
+android.arch.lifecycle.R
+android.arch.lifecycle.ReportFragment:
+    private static final java.lang.String REPORT_FRAGMENT_TAG
+    static android.arch.lifecycle.ReportFragment get(android.app.Activity)
+    void setProcessListener(android.arch.lifecycle.ReportFragment$ActivityInitializationListener)
+android.arch.lifecycle.ViewModelProvider$AndroidViewModelFactory
+android.arch.lifecycle.ViewModelProvider$NewInstanceFactory
+android.arch.lifecycle.ViewModelProvider:
+    private static final java.lang.String DEFAULT_KEY
+    public void <init>(android.arch.lifecycle.ViewModelStoreOwner,android.arch.lifecycle.ViewModelProvider$Factory)
+android.arch.lifecycle.ViewModelStoreOwner
+android.arch.lifecycle.livedata.core.BuildConfig
+android.arch.lifecycle.livedata.core.R
+android.arch.lifecycle.viewmodel.BuildConfig
+android.arch.lifecycle.viewmodel.R
+com.ispringle.dumbcast.BuildConfig
+com.ispringle.dumbcast.MainActivity:
+    public static final java.lang.String EXTRA_NAVIGATE_TO_TAB
+    private static final int TAB_BACKLOG
+    private static final int TAB_COUNT
+    private static final int TAB_DISCOVER
+    private static final int TAB_NEW
+    private static final int TAB_NOW_PLAYING
+    private static final int TAB_SUBSCRIPTIONS
+com.ispringle.dumbcast.R$color
+com.ispringle.dumbcast.R$drawable:
+    private void <init>()
+com.ispringle.dumbcast.R$id:
+    private void <init>()
+com.ispringle.dumbcast.R$layout:
+    private void <init>()
+com.ispringle.dumbcast.R$mipmap:
+    private void <init>()
+com.ispringle.dumbcast.R$string:
+    public static int app_name
+    public static int artwork_description
+    public static int button_pause
+    public static int button_play
+    public static int dialog_podcast_info_title
+    public static int discovery_title
+    public static int now_playing_header
+    public static int search_button
+    public static int search_hint
+    public static int subscriptions_title
+    public static int time_default
+    public static int toast_refresh
+    public static int toast_refresh_all
+    public static int toast_remove_new
+    private void <init>()
+com.ispringle.dumbcast.R$style
+com.ispringle.dumbcast.R
+com.ispringle.dumbcast.data.DatabaseHelper:
+    public static final java.lang.String COL_EPISODE_CHAPTERS_URL
+    public static final java.lang.String COL_EPISODE_DESCRIPTION
+    public static final java.lang.String COL_EPISODE_DOWNLOADED_AT
+    public static final java.lang.String COL_EPISODE_DOWNLOAD_PATH
+    public static final java.lang.String COL_EPISODE_DURATION
+    public static final java.lang.String COL_EPISODE_ENCLOSURE_LENGTH
+    public static final java.lang.String COL_EPISODE_ENCLOSURE_TYPE
+    public static final java.lang.String COL_EPISODE_ENCLOSURE_URL
+    public static final java.lang.String COL_EPISODE_FETCHED_AT
+    public static final java.lang.String COL_EPISODE_GUID
+    public static final java.lang.String COL_EPISODE_ID
+    public static final java.lang.String COL_EPISODE_PLAYBACK_POS
+    public static final java.lang.String COL_EPISODE_PLAYED_AT
+    public static final java.lang.String COL_EPISODE_PODCAST_ID
+    public static final java.lang.String COL_EPISODE_PUBLISHED_AT
+    public static final java.lang.String COL_EPISODE_SAVED_AT
+    public static final java.lang.String COL_EPISODE_SESSION_GRACE
+    public static final java.lang.String COL_EPISODE_STATE
+    public static final java.lang.String COL_EPISODE_TITLE
+    public static final java.lang.String COL_EPISODE_VIEWED_AT
+    public static final java.lang.String COL_PODCAST_ARTWORK_URL
+    public static final java.lang.String COL_PODCAST_CREATED
+    public static final java.lang.String COL_PODCAST_DESCRIPTION
+    public static final java.lang.String COL_PODCAST_FEED_URL
+    public static final java.lang.String COL_PODCAST_ID
+    public static final java.lang.String COL_PODCAST_INDEX_ID
+    public static final java.lang.String COL_PODCAST_LAST_REFRESH
+    public static final java.lang.String COL_PODCAST_REVERSE_ORDER
+    public static final java.lang.String COL_PODCAST_TITLE
+    private static final java.lang.String CREATE_EPISODES_TABLE
+    private static final java.lang.String CREATE_EPISODE_FETCHED_INDEX
+    private static final java.lang.String CREATE_EPISODE_PODCAST_STATE_INDEX
+    private static final java.lang.String CREATE_EPISODE_PUBLISHED_INDEX
+    private static final java.lang.String CREATE_EPISODE_STATE_INDEX
+    private static final java.lang.String CREATE_PODCASTS_TABLE
+    private static final java.lang.String DATABASE_NAME
+    private static final int DATABASE_VERSION
+    public static final java.lang.String TABLE_EPISODES
+    public static final java.lang.String TABLE_PODCASTS
+com.ispringle.dumbcast.data.DatabaseManager:
+    private void <init>()
+    public static synchronized void closeDatabase()
+com.ispringle.dumbcast.data.Episode:
+    public void setTitle(java.lang.String)
+com.ispringle.dumbcast.data.EpisodeRepository:
+    private static final long SEVEN_DAYS_MS
+    private static final java.lang.String TAG
+    public java.util.List getEpisodesByPodcast(long)
+com.ispringle.dumbcast.data.Podcast:
+    public void setFeedUrl(java.lang.String)
+com.ispringle.dumbcast.data.PodcastRepository:
+    private static final long ONE_HOUR_MS
+    private static final long SEVEN_DAYS_MS
+    private static final java.lang.String TAG
+    public void deletePodcast(long)
+    public void refreshAllPodcasts()
+    public void refreshPodcastWithLimit(long,int)
+com.ispringle.dumbcast.fragments.DiscoveryFragment:
+    private static final int TAB_SUBSCRIPTIONS
+    private static final java.lang.String TAG
+    private void onSubscribeFailure()
+com.ispringle.dumbcast.fragments.EpisodeListFragment:
+    private static final java.lang.String ARG_EPISODE_STATE
+    private static final java.lang.String ARG_PODCAST_ID
+    private static final java.lang.String ARG_PREVIEW_FEED_URL
+    private static final java.lang.String ARG_PREVIEW_TITLE
+    private static final java.lang.String TAG
+com.ispringle.dumbcast.fragments.NewFragment$3:
+    private static final long LONG_PRESS_DURATION
+com.ispringle.dumbcast.fragments.NewFragment:
+    private static final java.lang.String TAG
+com.ispringle.dumbcast.fragments.PlayerFragment:
+    private static final java.lang.String TAG
+com.ispringle.dumbcast.fragments.SubscribeResult:
+    public static com.ispringle.dumbcast.fragments.SubscribeResult alreadySubscribed()
+com.ispringle.dumbcast.fragments.SubscriptionsFragment:
+    private static final java.lang.String TAG
+com.ispringle.dumbcast.services.DownloadService:
+    private static final java.lang.String CHANNEL_ID
+    private static final java.lang.String PREFS_NAME
+    private static final java.lang.String TAG
+    public static void cancelDownload(android.content.Context,long)
+com.ispringle.dumbcast.services.PlaybackService:
+    public static final java.lang.String ACTION_LOAD_EPISODE
+    public static final java.lang.String ACTION_PAUSE
+    public static final java.lang.String ACTION_PLAY
+    public static final java.lang.String ACTION_SKIP_BACKWARD
+    public static final java.lang.String ACTION_SKIP_FORWARD
+    public static final java.lang.String ACTION_STOP
+    private static final java.lang.String CHANNEL_ID
+    public static final java.lang.String EXTRA_EPISODE_ID
+    private static final int NOTIFICATION_ID
+    private static final int POSITION_UPDATE_INTERVAL_MS
+    private static final int SKIP_BACKWARD_MS
+    private static final int SKIP_FORWARD_MS
+    private static final java.lang.String TAG
+com.ispringle.dumbcast.utils.ImageLoader:
+    private static final java.lang.String CACHE_DIR_NAME
+    private static final long MAX_DISK_CACHE_SIZE
+    private static final int MAX_MEMORY_CACHE_SIZE
+    private static final java.lang.String TAG
+    public void loadImage(android.content.Context,java.lang.String,android.widget.ImageView)
+com.ispringle.dumbcast.utils.PodcastIndexApi:
+    private static final java.lang.String API_KEY
+    private static final java.lang.String API_SECRET
+    private static final java.lang.String BASE_URL
+    private static final java.lang.String USER_AGENT
+    public void <init>()
+com.ispringle.dumbcast.utils.RssFeed$RssItem:
+    public java.lang.String getImageUrl()
+    public java.lang.String getLink()
+com.ispringle.dumbcast.utils.RssFeed:
+    public java.lang.String getLink()
+com.ispringle.dumbcast.utils.RssFeedUtils:
+    private static final int CONNECT_TIMEOUT_MS
+    private static final int MAX_HTTP_REDIRECTS
+    private static final int READ_TIMEOUT_MS
+    private static final java.lang.String TAG
+    private static final java.lang.String USER_AGENT
+    public void <init>()
+android.arch.core.executor.ArchTaskExecutor$1
+android.arch.core.executor.ArchTaskExecutor$2
+android.arch.core.executor.ArchTaskExecutor:
+    public android.arch.core.executor.DefaultTaskExecutor mDefaultTaskExecutor
+    public static final java.util.concurrent.Executor sIOThreadExecutor
+    public static final java.util.concurrent.Executor sMainThreadExecutor
+    static void <clinit>()
+    public final void executeOnDiskIO()
+    public final boolean isMainThread()
+    public final void postToMainThread(java.lang.Runnable)
+android.arch.core.executor.DefaultTaskExecutor:
+    public java.util.concurrent.ExecutorService mDiskIO
+    public final void executeOnDiskIO()
+    public final boolean isMainThread()
+    public final void postToMainThread(java.lang.Runnable)
+android.arch.core.executor.TaskExecutor:
+    public abstract void executeOnDiskIO()
+    public abstract boolean isMainThread()
+    public abstract void postToMainThread(java.lang.Runnable)
+android.arch.core.internal.FastSafeIterableMap:
+    public static java.util.Map$Entry ceil()
+    public static boolean contains()
+android.arch.core.internal.SafeIterableMap$1
+android.arch.core.internal.SafeIterableMap$AscendingIterator:
+    public final android.arch.core.internal.SafeIterableMap$Entry backward()
+    public final android.arch.core.internal.SafeIterableMap$Entry forward()
+android.arch.core.internal.SafeIterableMap$DescendingIterator
+android.arch.core.internal.SafeIterableMap$IteratorWithAdditions:
+    public final java.util.Map$Entry next()
+android.arch.core.internal.SafeIterableMap$ListIterator:
+    public abstract android.arch.core.internal.SafeIterableMap$Entry backward()
+    public abstract android.arch.core.internal.SafeIterableMap$Entry forward()
+    public abstract java.util.Map$Entry next()
+    public final android.arch.core.internal.SafeIterableMap$Entry nextNode()
+android.arch.core.internal.SafeIterableMap:
+    public static java.util.Iterator descendingIterator()
+    public static java.util.Map$Entry eldest()
+    public final android.arch.core.internal.SafeIterableMap$IteratorWithAdditions iteratorWithAdditions()
+    public static java.util.Map$Entry newest()
+    public final android.arch.core.internal.SafeIterableMap$Entry put(java.lang.Object,java.lang.Object)
+    public static int size()
+android.arch.lifecycle.ClassesInfoCache$CallbackInfo
+android.arch.lifecycle.ClassesInfoCache$MethodReference
+android.arch.lifecycle.ClassesInfoCache
+android.arch.lifecycle.CompositeGeneratedAdaptersObserver:
+    public final android.arch.lifecycle.GeneratedAdapter[] mGeneratedAdapters
+    public void <init>(android.arch.lifecycle.GeneratedAdapter[])
+android.arch.lifecycle.GeneratedAdapter
+android.arch.lifecycle.Lifecycle$State:
+    public final boolean isAtLeast()
+android.arch.lifecycle.Lifecycle:
+    public abstract void addObserver()
+    public abstract android.arch.lifecycle.Lifecycle$State getCurrentState()
+    public abstract void removeObserver()
+android.arch.lifecycle.LifecycleRegistry:
+    public final void addObserver()
+    public static void backwardPass()
+    public static void forwardPass()
+    public final android.arch.lifecycle.Lifecycle$State getCurrentState()
+    public static boolean isSynced()
+    public static void markState()
+    public static android.arch.lifecycle.Lifecycle$State min(android.arch.lifecycle.Lifecycle$State,android.arch.lifecycle.Lifecycle$State)
+    public final void popParentState()
+    public final void pushParentState(android.arch.lifecycle.Lifecycle$State)
+    public final void removeObserver()
+android.arch.lifecycle.LifecycleRegistryOwner
+android.arch.lifecycle.Lifecycling$$InternalSyntheticThrowCCEIfNotNull$6$a89a455982588247c627595b4e9dff02a5a530f997f57b07cc6b4a20206a840d$0
+android.arch.lifecycle.Lifecycling:
+    public static java.util.HashMap sCallbackCache
+    public static java.util.HashMap sClassToAdapters
+    public static void createGeneratedAdapter()
+    public static java.lang.String getAdapterName(java.lang.String)
+    public static int getObserverConstructorType(java.lang.Class)
+    public static boolean isLifecycleParent(java.lang.Class)
+android.arch.lifecycle.LiveData$AlwaysActiveObserver:
+    public final synthetic android.arch.lifecycle.LiveData this$0
+android.arch.lifecycle.MethodCallsLogger
+android.arch.lifecycle.OnLifecycleEvent
+android.arch.lifecycle.ReflectiveGenericLifecycleObserver:
+    public final android.arch.lifecycle.ClassesInfoCache$CallbackInfo mInfo
+    public final java.lang.Object mWrapped
+android.arch.lifecycle.ReportFragment$$InternalSyntheticThrowCCEIfNotNull$19$7d642936ef787dc0329cdb8643a9920d7db67e690c9e387cd850b008275f72b3$0
+android.arch.lifecycle.ReportFragment$ActivityInitializationListener
+android.arch.lifecycle.ReportFragment:
+    public android.arch.lifecycle.ReportFragment$ActivityInitializationListener mProcessListener
+    public static void dispatchCreate()
+    public static void dispatchResume()
+    public static void dispatchStart()
+android.arch.lifecycle.SingleGeneratedAdapterObserver:
+    public final android.arch.lifecycle.GeneratedAdapter mGeneratedAdapter
+android.arch.lifecycle.ViewModelProvider
+android.arch.lifecycle.ViewModelStore:
+    public final void clear()
+    public static android.arch.lifecycle.ViewModel get()
+    public static void put()
+android.support.v13.view.inputmethod.InputConnectionCompat:
+    static void <clinit>()
+android.support.v4.app.FrameMetricsAggregator$FrameMetricsApi24Impl:
+    static void <clinit>()
+android.support.v4.app.LoaderManagerImpl:
+    static void <clinit>()
+android.support.v4.app.SharedElementCallback:
+    static void <clinit>()
+android.support.v4.media.session.MediaSessionCompat$MediaSessionImplApi18:
+    static void <clinit>()
+android.support.v4.view.ViewConfigurationCompat:
+    static void <clinit>()
+android.support.v7.app.AppCompatDelegate:
+    static void <clinit>()
+android.support.v7.content.res.GrowingArrayUtils:
+    static void <clinit>()
+com.ispringle.dumbcast.MainActivity$1
+com.ispringle.dumbcast.MainActivity:
+    public static java.lang.String getTabName()
+    public static void loadFragment()
+    public final void navigateTab(int)
+com.ispringle.dumbcast.R$drawable
+com.ispringle.dumbcast.R$id
+com.ispringle.dumbcast.R$layout
+com.ispringle.dumbcast.R$mipmap
+com.ispringle.dumbcast.R$string
+com.ispringle.dumbcast.adapters.EpisodeAdapter$1
+com.ispringle.dumbcast.adapters.EpisodeAdapter:
+    public static java.lang.String formatDuration()
+com.ispringle.dumbcast.adapters.PodcastAdapter$1
+com.ispringle.dumbcast.adapters.PodcastAdapter
+com.ispringle.dumbcast.data.Episode:
+    public static java.lang.String getChaptersUrl()
+    public static java.lang.String getDescription()
+    public static java.lang.String getDownloadPath()
+    public static java.lang.Long getDownloadedAt()
+    public static int getDuration()
+    public static long getEnclosureLength()
+    public static java.lang.String getEnclosureType()
+    public static java.lang.String getEnclosureUrl()
+    public static long getFetchedAt()
+    public static java.lang.String getGuid()
+    public static long getId()
+    public static int getPlaybackPosition()
+    public static java.lang.Long getPlayedAt()
+    public static long getPodcastId()
+    public static long getPublishedAt()
+    public static java.lang.Long getSavedAt()
+    public static int getState()
+    public static java.lang.String getTitle()
+    public static java.lang.Long getViewedAt()
+    public static boolean isSessionGrace()
+    public static void setChaptersUrl()
+    public static void setDescription()
+    public static void setDownloadPath()
+    public static void setDownloadedAt()
+    public static void setDuration()
+    public static void setEnclosureLength()
+    public static void setEnclosureType()
+    public static void setFetchedAt()
+    public static void setId()
+    public static void setPlaybackPosition()
+    public static void setPlayedAt()
+    public static void setSavedAt()
+    public static void setSessionGrace()
+    public static void setState()
+    public static void setViewedAt()
+com.ispringle.dumbcast.data.EpisodeRepository:
+    public static void decayNewEpisodes()
+    public static android.content.ContentValues episodeToContentValues()
+    public static void fixDownloadedEpisodesState()
+    public static int getEpisodeCountByPodcast()
+    public static int getEpisodeCountByPodcastAndState()
+    public static java.util.List getEpisodesByPodcast()
+    public static java.util.List getEpisodesByState()
+    public static int updateEpisodePlaybackPosition()
+com.ispringle.dumbcast.data.EpisodeState$EnumUnboxingLocalUtility:
+    static void <clinit>()
+    public static int _fromString(java.lang.String)
+    public static int _valueOf(java.lang.String)
+    public static int[] _values()
+com.ispringle.dumbcast.data.EpisodeState$EnumUnboxingSharedUtility:
+    public static final synthetic int[] $VALUES
+    public static synthetic void checkNotZero(int)
+    public static synthetic void checkNotZero(int,java.lang.String)
+    public static synthetic int compareTo(int,int)
+    public static synthetic boolean equals(int,int)
+    public static synthetic boolean objects$equals(int,int)
+    public static synthetic int[] values(int)
+com.ispringle.dumbcast.data.EpisodeState
+com.ispringle.dumbcast.data.Podcast:
+    public static java.lang.String getArtworkUrl()
+    public static long getCreatedAt()
+    public static java.lang.String getDescription()
+    public static java.lang.String getFeedUrl()
+    public static long getId()
+    public static long getLastRefreshAt()
+    public static java.lang.Long getPodcastIndexId()
+    public static java.lang.String getTitle()
+    public static boolean isReverseOrder()
+    public static void setArtworkUrl()
+    public static void setCreatedAt()
+    public static void setDescription()
+    public static void setId()
+    public static void setLastRefreshAt()
+    public static void setPodcastIndexId()
+    public static void setReverseOrder()
+    public static void setTitle()
+com.ispringle.dumbcast.data.PodcastRepository:
+    public static boolean episodeExists()
+    public static com.ispringle.dumbcast.utils.RssFeed fetchFeed()
+    public static com.ispringle.dumbcast.data.Podcast getPodcastByFeedUrl()
+    public static android.content.ContentValues podcastToContentValues()
+    public static boolean shouldRefresh()
+    public static boolean toggleReverseOrder()
+com.ispringle.dumbcast.fragments.DiscoveryFragment$6
+com.ispringle.dumbcast.fragments.DiscoveryFragment$CheckSubscriptionTask:
+    public static varargs com.ispringle.dumbcast.fragments.SubscribeResult doInBackground()
+    public static varargs java.lang.Boolean doInBackground()
+    public static void onPostExecute()
+    public static void onPostExecute$1()
+com.ispringle.dumbcast.fragments.DiscoveryFragment$SearchTask:
+    public static varargs com.ispringle.dumbcast.fragments.DiscoveryFragment$SearchTaskResult doInBackground()
+    public static void onPostExecute()
+com.ispringle.dumbcast.fragments.DiscoveryFragment$SubscribeTask
+com.ispringle.dumbcast.fragments.DiscoveryFragment:
+    public static void access$200(com.ispringle.dumbcast.fragments.DiscoveryFragment,com.ispringle.dumbcast.utils.PodcastIndexApi$SearchResult)
+    public static void handleContextMenuAction()
+    public final void hideStatus()
+    public static void navigateToSubscriptions()
+    public static void onSubscribeSuccess()
+    public static void performSearch()
+    public static void showContextMenu()
+    public static void showError$1()
+    public static void showSubscribeDialog()
+    public static void subscribeToPodcast()
+    public final void subscribeToResult(com.ispringle.dumbcast.utils.PodcastIndexApi$SearchResult)
+    public static void updateSearchResults()
+    public static void viewEpisodes()
+    public static void viewPodcastInfo()
+com.ispringle.dumbcast.fragments.EpisodeListFragment$1
+com.ispringle.dumbcast.fragments.EpisodeListFragment$3
+com.ispringle.dumbcast.fragments.EpisodeListFragment$6
+com.ispringle.dumbcast.fragments.EpisodeListFragment$7
+com.ispringle.dumbcast.fragments.EpisodeListFragment$DeleteDownloadTask:
+    public final varargs java.lang.Integer doInBackground()
+com.ispringle.dumbcast.fragments.EpisodeListFragment$LoadEpisodesTask:
+    public static varargs com.ispringle.dumbcast.fragments.EpisodeListFragment$EpisodeData doInBackground()
+    public static varargs com.ispringle.dumbcast.fragments.NewFragment$PodcastData doInBackground()
+    public static varargs com.ispringle.dumbcast.fragments.SubscriptionsFragment$PodcastData doInBackground()
+    public static varargs com.ispringle.dumbcast.fragments.SubscriptionsFragment$RefreshAllResult doInBackground()
+    public static void onPostExecute()
+    public static void onPostExecute$1()
+    public static void onPostExecute$2()
+    public static void onPostExecute$3()
+    public static varargs void onProgressUpdate()
+com.ispringle.dumbcast.fragments.EpisodeListFragment$LoadPreviewEpisodesTask:
+    public static varargs com.ispringle.dumbcast.fragments.PreviewResult doInBackground()
+    public static varargs java.lang.String doInBackground()
+    public static void onPostExecute()
+    public static void onPostExecute$1()
+com.ispringle.dumbcast.fragments.EpisodeListFragment$RemoveNewTask
+com.ispringle.dumbcast.fragments.EpisodeListFragment$SaveToBacklogTask
+com.ispringle.dumbcast.fragments.EpisodeListFragment:
+    public static void deleteDownload()
+    public static void downloadEpisode()
+    public static void handleContextMenuAction$1()
+    public static void handleEpisodeLongClick()
+    public final void removeNew(com.ispringle.dumbcast.data.Episode)
+    public static void showContextMenu$1()
+    public static void showPodcastSettings()
+    public static void startPlaybackAndNavigate()
+    public static void updateEpisodeList()
+com.ispringle.dumbcast.fragments.NewFragment$1
+com.ispringle.dumbcast.fragments.NewFragment$2:
+    public final synthetic android.support.v4.app.Fragment this$0
+com.ispringle.dumbcast.fragments.NewFragment$LoadPodcastsTask
+com.ispringle.dumbcast.fragments.NewFragment$RefreshPodcastTask
+com.ispringle.dumbcast.fragments.NewFragment:
+    public final void loadPodcasts()
+    public static void navigateToEpisodeList()
+    public static void refreshPodcast()
+    public static void updatePodcastList()
+com.ispringle.dumbcast.fragments.PlayerFragment$11
+com.ispringle.dumbcast.fragments.PlayerFragment$12
+com.ispringle.dumbcast.fragments.PlayerFragment$1
+com.ispringle.dumbcast.fragments.PlayerFragment$2
+com.ispringle.dumbcast.fragments.PlayerFragment$5
+com.ispringle.dumbcast.fragments.PlayerFragment$6
+com.ispringle.dumbcast.fragments.PlayerFragment$7
+com.ispringle.dumbcast.fragments.PlayerFragment$DeleteEpisodeTask
+com.ispringle.dumbcast.fragments.PlayerFragment:
+    public android.widget.TextView progressText
+    public static void deleteEpisode()
+    public static void handleContextMenuAction$2()
+    public static boolean handleKeyDown()
+    public static void handleTimestampInput()
+    public final void onError()
+    public final void onPlaybackCompleted()
+    public final void onPlaybackPaused()
+    public final void onPlaybackStarted()
+    public final void onPlaybackStopped()
+    public final void onPositionChanged()
+    public static int parseTimestamp()
+    public static void showContextMenu$2()
+    public static void skipBackward()
+    public static void skipForward()
+    public static void skipToTimestamp()
+    public final void togglePlayPause()
+    public static void updateUI()
+    public static void viewChapters()
+    public static void viewShowNotes()
+com.ispringle.dumbcast.fragments.PreviewResult$Status$EnumUnboxingLocalUtility
+com.ispringle.dumbcast.fragments.PreviewResult$Status
+com.ispringle.dumbcast.fragments.PreviewResult:
+    public static java.util.List getEpisodes()
+    public static java.lang.String getErrorMessage()
+    public static java.util.Map getPodcastCache()
+    public static int getStatus()
+    public static boolean isSuccess()
+com.ispringle.dumbcast.fragments.SubscribeResult$Status$EnumUnboxingLocalUtility:
+    public static final enum int ALREADY_SUBSCRIBED
+    static void <clinit>()
+    public static int _valueOf(java.lang.String)
+    public static int[] _values()
+    public static synthetic java.lang.String name(int)
+    public static synthetic int valueOf(java.lang.String)
+com.ispringle.dumbcast.fragments.SubscribeResult$Status
+com.ispringle.dumbcast.fragments.SubscribeResult:
+    public static java.lang.String getErrorDetails()
+    public static int getStatus()
+    public static boolean isSuccess()
+    public static com.ispringle.dumbcast.fragments.SubscribeResult unknownError(java.lang.String)
+com.ispringle.dumbcast.fragments.SubscriptionsFragment$1
+com.ispringle.dumbcast.fragments.SubscriptionsFragment$2
+com.ispringle.dumbcast.fragments.SubscriptionsFragment$3
+com.ispringle.dumbcast.fragments.SubscriptionsFragment$4
+com.ispringle.dumbcast.fragments.SubscriptionsFragment$LoadPodcastsTask
+com.ispringle.dumbcast.fragments.SubscriptionsFragment$RefreshAllPodcastsTask
+com.ispringle.dumbcast.fragments.SubscriptionsFragment$RefreshPodcastTask:
+    public static varargs com.ispringle.dumbcast.fragments.SubscriptionsFragment$RefreshResult doInBackground()
+    public static varargs java.lang.Integer doInBackground()
+    public static void onPostExecute()
+    public static void onPostExecute$1()
+com.ispringle.dumbcast.fragments.SubscriptionsFragment$RefreshResult$Status$EnumUnboxingLocalUtility
+com.ispringle.dumbcast.fragments.SubscriptionsFragment$RefreshResult$Status
+com.ispringle.dumbcast.fragments.SubscriptionsFragment$RemoveNewFromAllTask
+com.ispringle.dumbcast.fragments.SubscriptionsFragment:
+    public static void handleContextMenuAction$3()
+    public static void navigateToEpisodeList$1()
+    public static void refreshAllPodcasts()
+    public static void refreshPodcast$1()
+    public static void removeNewFromAllEpisodes()
+    public static void showContextMenu$3()
+    public static void unsubscribePodcast()
+    public static void updatePodcastList$1()
+com.ispringle.dumbcast.services.DownloadService:
+    public static void cancelDownload()
+    public static void createNotificationChannel()
+    public static void downloadEpisode()
+    public static java.lang.Long getDownloadMapping()
+    public static java.lang.String getFailureReason()
+    public static java.lang.String getFileExtension()
+    public static void handleDownloadComplete()
+    public final void removeDownloadMapping(long)
+    public static void saveDownloadMapping()
+    public static void showSuccessNotification()
+    public static void startDownload(android.content.Context,long)
+com.ispringle.dumbcast.services.PlaybackService$$InternalSyntheticLambda$2$20d4b9a8d1857ae9bfa2924b35fd92db7c4482b44d11cce03bd7ccd7abb42566$0
+com.ispringle.dumbcast.services.PlaybackService$1
+com.ispringle.dumbcast.services.PlaybackService$PlaybackBinder:
+    public static com.ispringle.dumbcast.services.PlaybackService getService()
+com.ispringle.dumbcast.services.PlaybackService$PlaybackListener:
+    public abstract void onError()
+    public abstract void onPlaybackCompleted()
+    public abstract void onPlaybackPaused()
+    public abstract void onPlaybackStarted()
+    public abstract void onPlaybackStopped()
+    public abstract void onPositionChanged()
+com.ispringle.dumbcast.services.PlaybackService:
+    public static void createNotificationChannel()
+    public static com.ispringle.dumbcast.data.Episode getCurrentEpisode()
+    public final int getCurrentPosition()
+    public static void handleAction()
+    public static boolean isPlaying()
+    public static synthetic void lambda$loadEpisode$3()
+    public static void lambda$loadEpisodeById$4()
+    public static synthetic void lambda$loadEpisodeById$5()
+    public static synthetic void lambda$markAsListened$7()
+    public static void lambda$onCreate$0()
+    public static synthetic boolean lambda$onCreate$1()
+    public static synthetic void lambda$onCreate$2()
+    public static void lambda$savePlaybackPosition$6()
+    public static void loadEpisode()
+    public static void loadEpisodeById()
+    public static void markAsListened()
+    public static void onPlaybackCompleted()
+    public static void seekTo()
+    public static void setPlaybackListener()
+    public static void stop()
+    public static void updatePlayedAt()
+com.ispringle.dumbcast.utils.ImageLoader$1:
+    public final synthetic com.ispringle.dumbcast.utils.ImageLoader this$0
+    public static int sizeOf()
+com.ispringle.dumbcast.utils.ImageLoader$2:
+    public final synthetic com.ispringle.dumbcast.utils.ImageLoader this$0
+    public static int compare()
+com.ispringle.dumbcast.utils.ImageLoader$LoadImageTask:
+    public static varargs android.graphics.Bitmap doInBackground()
+    public static void onPostExecute()
+com.ispringle.dumbcast.utils.ImageLoader:
+    public static void addBitmapToMemCache()
+    public static android.graphics.Bitmap downloadBitmap()
+    public static android.arch.lifecycle.ViewModel get()
+    public static android.arch.lifecycle.ViewModel get$1()
+    public static android.graphics.Bitmap getBitmapFromMemCache()
+    public static android.graphics.Bitmap loadFromDiskCache()
+    public static void loadImageWithFallback()
+    public static java.lang.String md5()
+    public static void saveToDiskCache()
+    public static void setPlaceholder(android.widget.ImageView)
+com.ispringle.dumbcast.utils.PodcastIndexApi$SearchResult:
+    public static java.lang.String getArtworkUrl()
+    public static java.lang.String getAuthor()
+    public static java.lang.String getDescription()
+    public static int getEpisodeCount()
+    public static java.lang.String getFeedUrl()
+    public static long getId()
+    public static java.lang.String getTitle()
+com.ispringle.dumbcast.utils.PodcastIndexApi
+com.ispringle.dumbcast.utils.RssFeed$RssItem:
+    public java.lang.String imageUrl
+    public java.lang.String link
+    public static java.lang.String getChaptersUrl()
+    public static java.lang.String getDescription()
+    public static int getDuration()
+    public static long getEnclosureLength()
+    public static java.lang.String getEnclosureType()
+    public static java.lang.String getEnclosureUrl()
+    public static java.lang.String getGuid()
+    public static long getPublishedAt()
+    public static java.lang.String getTitle()
+    public static void setChaptersUrl()
+    public static void setDescription()
+    public static void setDuration()
+    public static void setEnclosureLength()
+    public static void setEnclosureType()
+    public static void setEnclosureUrl()
+    public static void setGuid()
+    public static void setImageUrl()
+    public static void setLink()
+    public static void setPublishedAt()
+    public static void setTitle()
+com.ispringle.dumbcast.utils.RssFeed:
+    public java.lang.String link
+    public static void addItem()
+    public static java.lang.String getDescription()
+    public static java.lang.String getImageUrl()
+    public static java.util.List getItems()
+    public static java.lang.String getTitle()
+    public static void setDescription()
+    public static void setImageUrl()
+    public static void setLink()
+    public static void setTitle()
+com.ispringle.dumbcast.utils.RssFeedUtils
+com.ispringle.dumbcast.utils.RssParser:
+    public static final java.lang.String ns
+    public static long parseDate()
+    public static int parseDuration()
+    public static void readChannel()
+    public static void readImage()
+    public static com.ispringle.dumbcast.utils.RssFeed$RssItem readItem()
