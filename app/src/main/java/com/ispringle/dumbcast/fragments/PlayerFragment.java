@@ -12,6 +12,7 @@ import android.os.IBinder;
 import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
 import android.text.InputType;
+import android.text.method.LinkMovementMethod;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -20,6 +21,7 @@ import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -273,6 +275,10 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
 
         // Update episode info
         episodeTitleText.setText(currentEpisode.getTitle());
+
+        // Clear artwork before loading new image to prevent showing previous episode's artwork
+        artworkImage.setImageDrawable(null);
+        artworkImage.setBackgroundColor(0);
 
         // Load artwork with fallback: try episode artwork first, fall back to podcast artwork
         Podcast podcast = podcastRepository.getPodcastById(currentEpisode.getPodcastId());
@@ -691,10 +697,20 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
             formattedDescription = android.text.Html.fromHtml(description);
         }
 
+        // Create TextView with clickable links
+        TextView textView = new TextView(getContext());
+        textView.setText(formattedDescription);
+        textView.setMovementMethod(LinkMovementMethod.getInstance()); // Make links clickable
+        textView.setPadding(48, 16, 48, 16); // Add padding for readability
+
+        // Wrap in ScrollView for long content
+        ScrollView scrollView = new ScrollView(getContext());
+        scrollView.addView(textView);
+
         // Show description in scrollable dialog
         AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
         builder.setTitle(R.string.player_show_notes_title);
-        builder.setMessage(formattedDescription);
+        builder.setView(scrollView);
         builder.setPositiveButton(R.string.dialog_close, null);
         builder.show();
     }

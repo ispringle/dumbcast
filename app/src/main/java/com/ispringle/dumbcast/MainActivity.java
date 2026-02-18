@@ -364,10 +364,14 @@ public class MainActivity extends AppCompatActivity {
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_LEFT:
                 // Navigate to previous tab
+                // Sync currentTab with actual displayed fragment before navigating
+                syncCurrentTabWithFragment();
                 navigateTab(-1);
                 return true;
             case KeyEvent.KEYCODE_DPAD_RIGHT:
                 // Navigate to next tab
+                // Sync currentTab with actual displayed fragment before navigating
+                syncCurrentTabWithFragment();
                 navigateTab(1);
                 return true;
             case KeyEvent.KEYCODE_DPAD_CENTER:
@@ -380,5 +384,38 @@ public class MainActivity extends AppCompatActivity {
             default:
                 return super.onKeyDown(keyCode, event);
         }
+    }
+
+    /**
+     * Sync currentTab with the actual displayed fragment.
+     * This ensures D-pad navigation works correctly when drilling into sub-fragments
+     * (e.g., navigating from Backlog to episode to Now Playing).
+     */
+    private void syncCurrentTabWithFragment() {
+        Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+
+        if (currentFragment instanceof NewFragment) {
+            currentTab = TAB_NEW;
+        } else if (currentFragment instanceof SubscriptionsFragment) {
+            currentTab = TAB_SUBSCRIPTIONS;
+        } else if (currentFragment instanceof DiscoveryFragment) {
+            currentTab = TAB_DISCOVER;
+        } else if (currentFragment instanceof PlayerFragment) {
+            currentTab = TAB_NOW_PLAYING;
+        } else if (currentFragment instanceof EpisodeListFragment) {
+            // EpisodeListFragment can be either BACKLOG tab or a drill-down from another tab
+            // Check if this is the BACKLOG tab by examining the back stack
+            // If back stack is empty, we're at a top-level tab (BACKLOG)
+            // If back stack has entries, we're in a drill-down (keep currentTab as is)
+            if (getSupportFragmentManager().getBackStackEntryCount() == 0) {
+                // This is the BACKLOG tab view (top-level)
+                currentTab = TAB_BACKLOG;
+            }
+            // Otherwise keep currentTab unchanged (drill-down from Subscriptions/New)
+        }
+
+        Log.d(TAG, "syncCurrentTabWithFragment: currentTab=" + currentTab +
+            ", currentFragment=" + (currentFragment != null ? currentFragment.getClass().getSimpleName() : "null") +
+            ", backStackCount=" + getSupportFragmentManager().getBackStackEntryCount());
     }
 }
