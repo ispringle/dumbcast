@@ -1,6 +1,11 @@
 package com.ispringle.dumbcast;
 
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.AppCompatActivity;
@@ -17,6 +22,7 @@ import com.ispringle.dumbcast.fragments.EpisodeListFragment;
 import com.ispringle.dumbcast.fragments.NewFragment;
 import com.ispringle.dumbcast.fragments.PlayerFragment;
 import com.ispringle.dumbcast.fragments.SubscriptionsFragment;
+import com.ispringle.dumbcast.services.PlaybackService;
 
 /**
  * Main activity providing tabbed navigation for the podcast app.
@@ -42,6 +48,11 @@ public class MainActivity extends AppCompatActivity {
     // Current tab (default to Subscriptions)
     private int currentTab = TAB_SUBSCRIPTIONS;
 
+    // Service binding for checking playback state
+    private PlaybackService playbackService;
+    private boolean serviceBound = false;
+    private boolean isCheckingPlayback = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -60,6 +71,11 @@ public class MainActivity extends AppCompatActivity {
             // If none, start on Discovery tab instead of Subscriptions
             if (podcastRepository.getAllPodcasts().isEmpty()) {
                 currentTab = TAB_DISCOVER;
+            } else {
+                // Check if there's an active playback session
+                // If yes, default to Now Playing tab
+                isCheckingPlayback = true;
+                checkPlaybackAndSetTab();
             }
         }
 
@@ -81,8 +97,80 @@ public class MainActivity extends AppCompatActivity {
         updateTabIndicator();
 
         // Set initial fragment if this is first creation
-        if (savedInstanceState == null) {
+        // Only load if we're not checking playback state
+        if (savedInstanceState == null && !isCheckingPlayback) {
             loadFragmentForTab(currentTab);
+        }
+    }
+
+    /**
+     * Check if PlaybackService is running with an active episode
+     * and set the initial tab to Now Playing if so.
+     */
+    private void checkPlaybackAndSetTab() {
+        Intent intent = new Intent(this, PlaybackService.class);
+        boolean bound = bindService(intent, playbackCheckConnection, Context.BIND_AUTO_CREATE);
+
+        // If binding fails, just load the default tab
+        if (!bound) {
+            isCheckingPlayback = false;
+            loadFragmentForTab(currentTab);
+        }
+    }
+
+    /**
+     * ServiceConnection for checking playback state at startup
+     */
+    private final ServiceConnection playbackCheckConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            PlaybackService.PlaybackBinder binder = (PlaybackService.PlaybackBinder) service;
+            playbackService = binder.getService();
+            serviceBound = true;
+
+            // Check if there's an active episode
+            if (playbackService.getCurrentEpisode() != null) {
+                // Set tab to Now Playing
+                currentTab = TAB_NOW_PLAYING;
+                updateTabIndicator();
+            }
+
+            // Load the appropriate fragment
+            loadFragmentForTab(currentTab);
+            isCheckingPlayback = false;
+
+            // Unbind immediately - we only needed to check the state
+            unbindService(playbackCheckConnection);
+            serviceBound = false;
+            playbackService = null;
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            serviceBound = false;
+            playbackService = null;
+
+            // If we're still checking playback, load the default tab
+            if (isCheckingPlayback) {
+                isCheckingPlayback = false;
+                loadFragmentForTab(currentTab);
+            }
+        }
+    };
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        // Clean up service connection if still bound
+        if (serviceBound) {
+            try {
+                unbindService(playbackCheckConnection);
+            } catch (IllegalArgumentException e) {
+                // Service was not registered, ignore
+            }
+            serviceBound = false;
+            playbackService = null;
         }
     }
 

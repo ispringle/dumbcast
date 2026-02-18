@@ -448,6 +448,11 @@ public class EpisodeListFragment extends Fragment {
         // Always show Add to Backlog
         menuItems.add(getString(R.string.menu_add_to_backlog));
 
+        // If BACKLOG state: show Remove from Backlog
+        if (episode.getState() == EpisodeState.BACKLOG) {
+            menuItems.add(getString(R.string.menu_remove_from_backlog));
+        }
+
         // If NEW state: show Remove NEW
         if (episode.getState() == EpisodeState.NEW) {
             menuItems.add(getString(R.string.menu_remove_new_episode));
@@ -471,15 +476,15 @@ public class EpisodeListFragment extends Fragment {
     /**
      * Handle context menu action selection.
      * Menu indices depend on episode state:
-     * - If downloaded: 0=Delete Download, 1=Play, 2=Add to Backlog, 3=Remove NEW (if NEW)
-     * - If not downloaded: 0=Download, 1=Add to Backlog, 2=Remove NEW (if NEW)
+     * - If downloaded: 0=Delete Download, 1=Play, 2=Add to Backlog, 3=Remove from Backlog (if BACKLOG), 4=Remove NEW (if NEW)
+     * - If not downloaded: 0=Download, 1=Add to Backlog, 2=Remove from Backlog (if BACKLOG), 3=Remove NEW (if NEW)
      *
      * @param episode The episode to act on
      * @param actionIndex The selected menu item index
      */
     private void handleContextMenuAction(Episode episode, int actionIndex) {
         if (episode.isDownloaded()) {
-            // Downloaded menu: Delete Download, Play, Add to Backlog, [Remove NEW]
+            // Downloaded menu: Delete Download, Play, Add to Backlog, [Remove from Backlog], [Remove NEW]
             switch (actionIndex) {
                 case 0: // Delete Download
                     deleteDownload(episode);
@@ -490,12 +495,19 @@ public class EpisodeListFragment extends Fragment {
                 case 2: // Add to Backlog
                     addToBacklog(episode);
                     break;
-                case 3: // Remove NEW (only if NEW state)
+                case 3: // Remove from Backlog (if BACKLOG) or Remove NEW (if NEW and not BACKLOG)
+                    if (episode.getState() == EpisodeState.BACKLOG) {
+                        removeFromBacklog(episode);
+                    } else {
+                        removeNew(episode);
+                    }
+                    break;
+                case 4: // Remove NEW (only if both BACKLOG and NEW - shouldn't happen but handle it)
                     removeNew(episode);
                     break;
             }
         } else {
-            // Not downloaded menu: Download, Add to Backlog, [Remove NEW]
+            // Not downloaded menu: Download, Add to Backlog, [Remove from Backlog], [Remove NEW]
             switch (actionIndex) {
                 case 0: // Download
                     downloadEpisode(episode);
@@ -503,7 +515,14 @@ public class EpisodeListFragment extends Fragment {
                 case 1: // Add to Backlog
                     addToBacklog(episode);
                     break;
-                case 2: // Remove NEW (only if NEW state)
+                case 2: // Remove from Backlog (if BACKLOG) or Remove NEW (if NEW and not BACKLOG)
+                    if (episode.getState() == EpisodeState.BACKLOG) {
+                        removeFromBacklog(episode);
+                    } else {
+                        removeNew(episode);
+                    }
+                    break;
+                case 3: // Remove NEW (only if both BACKLOG and NEW - shouldn't happen but handle it)
                     removeNew(episode);
                     break;
             }
@@ -565,6 +584,14 @@ public class EpisodeListFragment extends Fragment {
      */
     private void removeNew(Episode episode) {
         new RemoveNewTask(this, episodeRepository, episode).execute();
+    }
+
+    /**
+     * Remove episode from backlog.
+     * @param episode The episode to remove from backlog
+     */
+    private void removeFromBacklog(Episode episode) {
+        new RemoveFromBacklogTask(this, episodeRepository, episode).execute();
     }
 
     /**
@@ -751,6 +778,40 @@ public class EpisodeListFragment extends Fragment {
             if (fragment != null && fragment.getContext() != null) {
                 if (rowsUpdated > 0) {
                     Toast.makeText(fragment.getContext(), R.string.toast_marked_viewed, Toast.LENGTH_SHORT).show();
+                    // Refresh the list
+                    fragment.loadEpisodes();
+                } else {
+                    Toast.makeText(fragment.getContext(), R.string.toast_failed_update_episode, Toast.LENGTH_SHORT).show();
+                }
+            }
+        }
+    }
+
+    /**
+     * AsyncTask to remove episode from backlog on a background thread.
+     */
+    private static class RemoveFromBacklogTask extends AsyncTask<Void, Void, Integer> {
+        private final WeakReference<EpisodeListFragment> fragmentRef;
+        private final EpisodeRepository repository;
+        private final Episode episode;
+
+        RemoveFromBacklogTask(EpisodeListFragment fragment, EpisodeRepository repository, Episode episode) {
+            this.fragmentRef = new WeakReference<>(fragment);
+            this.repository = repository;
+            this.episode = episode;
+        }
+
+        @Override
+        protected Integer doInBackground(Void... voids) {
+            return repository.updateEpisodeState(episode.getId(), EpisodeState.AVAILABLE);
+        }
+
+        @Override
+        protected void onPostExecute(Integer rowsUpdated) {
+            EpisodeListFragment fragment = fragmentRef.get();
+            if (fragment != null && fragment.getContext() != null) {
+                if (rowsUpdated > 0) {
+                    Toast.makeText(fragment.getContext(), R.string.toast_removed_from_backlog, Toast.LENGTH_SHORT).show();
                     // Refresh the list
                     fragment.loadEpisodes();
                 } else {

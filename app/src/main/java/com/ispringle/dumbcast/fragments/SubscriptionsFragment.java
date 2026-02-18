@@ -292,11 +292,28 @@ public class SubscriptionsFragment extends Fragment {
     }
 
     /**
-     * Unsubscribe from a podcast (stub implementation).
+     * Unsubscribe from a podcast.
+     * Shows confirmation dialog, then deletes podcast and all episodes.
      * @param podcast The podcast to unsubscribe from
      */
-    private void unsubscribePodcast(Podcast podcast) {
-        Toast.makeText(getContext(), getString(R.string.toast_unsubscribe, podcast.getTitle()), Toast.LENGTH_SHORT).show();
+    private void unsubscribePodcast(final Podcast podcast) {
+        if (getContext() == null) {
+            return;
+        }
+
+        // Show confirmation dialog
+        String message = getString(R.string.dialog_unsubscribe_message, podcast.getTitle());
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle(R.string.dialog_unsubscribe_title);
+        builder.setMessage(message);
+        builder.setPositiveButton(R.string.dialog_unsubscribe, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                new UnsubscribePodcastTask(SubscriptionsFragment.this, podcastRepository, episodeRepository, podcast).execute();
+            }
+        });
+        builder.setNegativeButton(R.string.dialog_cancel, null);
+        builder.show();
     }
 
     /**
@@ -619,6 +636,72 @@ public class SubscriptionsFragment extends Fragment {
             // Refresh the podcast list to update episode counts
             if (result.totalNewEpisodes > 0) {
                 fragment.loadPodcasts();
+            }
+        }
+    }
+
+    /**
+     * AsyncTask to unsubscribe from a podcast on a background thread.
+     * Deletes all downloaded episode files and removes podcast from database.
+     */
+    private static class UnsubscribePodcastTask extends AsyncTask<Void, Void, Boolean> {
+        private final WeakReference<SubscriptionsFragment> fragmentRef;
+        private final PodcastRepository podcastRepository;
+        private final EpisodeRepository episodeRepository;
+        private final Podcast podcast;
+
+        UnsubscribePodcastTask(SubscriptionsFragment fragment, PodcastRepository podcastRepository,
+                             EpisodeRepository episodeRepository, Podcast podcast) {
+            this.fragmentRef = new WeakReference<>(fragment);
+            this.podcastRepository = podcastRepository;
+            this.episodeRepository = episodeRepository;
+            this.podcast = podcast;
+        }
+
+        @Override
+        protected Boolean doInBackground(Void... voids) {
+            try {
+                // Get all episodes for this podcast
+                List<Episode> episodes = episodeRepository.getEpisodesByPodcast(podcast.getId());
+
+                // Delete downloaded files for all episodes
+                for (Episode episode : episodes) {
+                    if (episode.isDownloaded() && episode.getDownloadPath() != null) {
+                        java.io.File file = new java.io.File(episode.getDownloadPath());
+                        if (file.exists()) {
+                            if (!file.delete()) {
+                                Log.w(TAG, "Failed to delete file: " + episode.getDownloadPath());
+                            } else {
+                                Log.d(TAG, "Deleted file: " + episode.getDownloadPath());
+                            }
+                        }
+                    }
+                }
+
+                // Delete podcast (episodes will be deleted automatically via CASCADE)
+                podcastRepository.deletePodcast(podcast.getId());
+
+                return true;
+            } catch (Exception e) {
+                Log.e(TAG, "Error unsubscribing from podcast: " + podcast.getTitle(), e);
+                return false;
+            }
+        }
+
+        @Override
+        protected void onPostExecute(Boolean success) {
+            SubscriptionsFragment fragment = fragmentRef.get();
+            if (fragment == null || fragment.getContext() == null) {
+                return;
+            }
+
+            if (success) {
+                String message = fragment.getString(R.string.toast_unsubscribe_success, podcast.getTitle());
+                Toast.makeText(fragment.getContext(), message, Toast.LENGTH_SHORT).show();
+                // Refresh the podcast list
+                fragment.loadPodcasts();
+            } else {
+                Toast.makeText(fragment.getContext(), R.string.toast_unsubscribe_failed, Toast.LENGTH_SHORT).show();
             }
         }
     }

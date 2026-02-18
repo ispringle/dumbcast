@@ -25,6 +25,11 @@
     <string name="toast_refresh_all">Refresh All Podcasts</string>
     <string name="toast_unsubscribe">Unsubscribe: %s</string>
     <string name="toast_remove_new">Remove NEW from: %s</string>
+    <string name="dialog_unsubscribe_title">Unsubscribe</string>
+    <string name="dialog_unsubscribe_message">Unsubscribe from \"%s\"?\n\nThis will delete the podcast and all its episodes (including downloads).</string>
+    <string name="toast_unsubscribe_success">Unsubscribed from %s</string>
+    <string name="toast_unsubscribe_failed">Failed to unsubscribe</string>
+    <string name="dialog_unsubscribe">Unsubscribe</string>
     <string name="menu_delete_download">Delete Download</string>
     <string name="menu_play">Play</string>
     <string name="menu_download">Download</string>
