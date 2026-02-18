@@ -14,6 +14,7 @@ import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.TextView;
 
+import com.ispringle.dumbcast.MainActivity;
 import com.ispringle.dumbcast.R;
 import com.ispringle.dumbcast.adapters.PodcastAdapter;
 import com.ispringle.dumbcast.data.DatabaseHelper;
@@ -309,6 +310,10 @@ public class NewFragment extends Fragment {
                     android.widget.Toast.LENGTH_SHORT).show();
                 // Reload podcasts to show updated episode counts
                 fragment.loadPodcasts();
+                // Update tab visibility in MainActivity (new episodes may have been added)
+                if (fragment.getActivity() instanceof MainActivity) {
+                    ((MainActivity) fragment.getActivity()).updateTabVisibility();
+                }
             } else {
                 String errorMsg = "Failed to refresh";
                 if (result != null && result.startsWith("NETWORK_ERROR")) {
