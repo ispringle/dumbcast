@@ -27,8 +27,6 @@ import com.ispringle.dumbcast.data.EpisodeRepository;
 import com.ispringle.dumbcast.data.EpisodeState;
 import com.ispringle.dumbcast.data.Podcast;
 import com.ispringle.dumbcast.data.PodcastRepository;
-import com.ispringle.dumbcast.utils.RssFeed;
-import com.ispringle.dumbcast.utils.RssFeedUtils;
 
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -273,8 +271,8 @@ public class SubscriptionsFragment extends Fragment {
         String message = getString(R.string.toast_refreshing_podcast, podcast.getTitle());
         Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
 
-        // Start async task to fetch and parse RSS
-        new RefreshPodcastTask(this, podcast, episodeRepository).execute();
+        // Start async task to refresh via PodcastRepository
+        new RefreshPodcastTask(this, podcast, podcastRepository, episodeRepository).execute();
     }
 
     /**
@@ -417,65 +415,34 @@ public class SubscriptionsFragment extends Fragment {
     }
 
     /**
-     * AsyncTask to refresh a podcast by fetching its RSS feed and adding new episodes.
+     * AsyncTask to refresh a podcast using PodcastRepository.
+     * This ensures we use the fixed timestamp-based filtering logic.
      */
     private static class RefreshPodcastTask extends AsyncTask<Void, Void, RefreshResult> {
         private final WeakReference<SubscriptionsFragment> fragmentRef;
         private final Podcast podcast;
+        private final PodcastRepository podcastRepository;
         private final EpisodeRepository episodeRepository;
 
-        RefreshPodcastTask(SubscriptionsFragment fragment, Podcast podcast, EpisodeRepository episodeRepository) {
+        RefreshPodcastTask(SubscriptionsFragment fragment, Podcast podcast, PodcastRepository podcastRepository, EpisodeRepository episodeRepository) {
             this.fragmentRef = new WeakReference<>(fragment);
             this.podcast = podcast;
+            this.podcastRepository = podcastRepository;
             this.episodeRepository = episodeRepository;
         }
 
         @Override
         protected RefreshResult doInBackground(Void... voids) {
             try {
-                // Fetch RSS feed
-                RssFeed feed = RssFeedUtils.fetchFeed(podcast.getFeedUrl());
+                // Get episode count before refresh
+                int episodeCountBefore = episodeRepository.getEpisodeCountByPodcast(podcast.getId());
 
-                // Process each episode from the feed
-                int newEpisodeCount = 0;
-                long now = System.currentTimeMillis();
+                // Use PodcastRepository.refreshPodcast() which has timestamp filtering
+                podcastRepository.refreshPodcast(podcast.getId());
 
-                for (RssFeed.RssItem item : feed.getItems()) {
-                    // Skip if no GUID (required for duplicate detection)
-                    if (item.getGuid() == null || item.getGuid().isEmpty()) {
-                        Log.w(TAG, "Skipping episode without GUID: " + item.getTitle());
-                        continue;
-                    }
-
-                    // Check if episode already exists
-                    if (episodeRepository.episodeExists(podcast.getId(), item.getGuid())) {
-                        continue;
-                    }
-
-                    // Create new episode
-                    Episode episode = new Episode(
-                        podcast.getId(),
-                        item.getGuid(),
-                        item.getTitle(),
-                        item.getEnclosureUrl(),
-                        item.getPublishedAt()
-                    );
-
-                    // Set optional fields
-                    episode.setDescription(item.getDescription());
-                    episode.setEnclosureType(item.getEnclosureType());
-                    episode.setEnclosureLength(item.getEnclosureLength());
-                    episode.setDuration(item.getDuration());
-                    episode.setChaptersUrl(item.getChaptersUrl());
-                    episode.setFetchedAt(now);
-                    episode.setState(EpisodeState.NEW);
-
-                    // Insert into database
-                    long result = episodeRepository.insertEpisode(episode);
-                    if (result != -1) {
-                        newEpisodeCount++;
-                    }
-                }
+                // Get episode count after refresh to calculate new episodes
+                int episodeCountAfter = episodeRepository.getEpisodeCountByPodcast(podcast.getId());
+                int newEpisodeCount = episodeCountAfter - episodeCountBefore;
 
                 return new RefreshResult(RefreshResult.Status.SUCCESS, newEpisodeCount);
 
@@ -540,8 +507,8 @@ public class SubscriptionsFragment extends Fragment {
     }
 
     /**
-     * AsyncTask to refresh all podcasts sequentially.
-     * Publishes progress updates for each podcast and shows a final summary.
+     * AsyncTask to refresh all podcasts using PodcastRepository.
+     * This ensures we use the fixed timestamp-based filtering logic.
      */
     private static class RefreshAllPodcastsTask extends AsyncTask<Void, String, RefreshAllResult> {
         private final WeakReference<SubscriptionsFragment> fragmentRef;
@@ -566,52 +533,15 @@ public class SubscriptionsFragment extends Fragment {
             // Iterate through each podcast
             for (Podcast podcast : podcasts) {
                 try {
-                    // Fetch RSS feed
-                    RssFeed feed = RssFeedUtils.fetchFeed(podcast.getFeedUrl());
+                    // Get episode count before refresh
+                    int episodeCountBefore = episodeRepository.getEpisodeCountByPodcast(podcast.getId());
 
-                    // Process each episode from the feed
-                    int newEpisodeCount = 0;
-                    long now = System.currentTimeMillis();
+                    // Use PodcastRepository.refreshPodcast() which has timestamp filtering
+                    podcastRepository.refreshPodcast(podcast.getId());
 
-                    for (RssFeed.RssItem item : feed.getItems()) {
-                        // Skip if no GUID (required for duplicate detection)
-                        if (item.getGuid() == null || item.getGuid().isEmpty()) {
-                            Log.w(TAG, "Skipping episode without GUID: " + item.getTitle());
-                            continue;
-                        }
-
-                        // Check if episode already exists
-                        if (episodeRepository.episodeExists(podcast.getId(), item.getGuid())) {
-                            continue;
-                        }
-
-                        // Create new episode
-                        Episode episode = new Episode(
-                            podcast.getId(),
-                            item.getGuid(),
-                            item.getTitle(),
-                            item.getEnclosureUrl(),
-                            item.getPublishedAt()
-                        );
-
-                        // Set optional fields
-                        episode.setDescription(item.getDescription());
-                        episode.setEnclosureType(item.getEnclosureType());
-                        episode.setEnclosureLength(item.getEnclosureLength());
-                        episode.setDuration(item.getDuration());
-                        episode.setChaptersUrl(item.getChaptersUrl());
-                        episode.setFetchedAt(now);
-                        episode.setState(EpisodeState.NEW);
-
-                        // Insert into database
-                        long result = episodeRepository.insertEpisode(episode);
-                        if (result != -1) {
-                            newEpisodeCount++;
-                        }
-                    }
-
-                    // Update last refresh timestamp
-                    updateLastRefreshTimestamp(podcast.getId());
+                    // Get episode count after refresh to calculate new episodes
+                    int episodeCountAfter = episodeRepository.getEpisodeCountByPodcast(podcast.getId());
+                    int newEpisodeCount = episodeCountAfter - episodeCountBefore;
 
                     // Track success
                     totalNewEpisodes += newEpisodeCount;
@@ -636,27 +566,6 @@ public class SubscriptionsFragment extends Fragment {
             }
 
             return new RefreshAllResult(totalNewEpisodes, successCount, failCount);
-        }
-
-        /**
-         * Update the last refresh timestamp for a podcast.
-         * @param podcastId The ID of the podcast
-         */
-        private void updateLastRefreshTimestamp(long podcastId) {
-            SubscriptionsFragment fragment = fragmentRef.get();
-            if (fragment != null && fragment.getContext() != null) {
-                DatabaseHelper dbHelper = DatabaseManager.getInstance(fragment.getContext());
-                android.content.ContentValues values = new android.content.ContentValues();
-                values.put(DatabaseHelper.COL_PODCAST_LAST_REFRESH, System.currentTimeMillis());
-
-                android.database.sqlite.SQLiteDatabase db = dbHelper.getWritableDatabase();
-                db.update(
-                    DatabaseHelper.TABLE_PODCASTS,
-                    values,
-                    DatabaseHelper.COL_PODCAST_ID + " = ?",
-                    new String[]{String.valueOf(podcastId)}
-                );
-            }
         }
 
         @Override
