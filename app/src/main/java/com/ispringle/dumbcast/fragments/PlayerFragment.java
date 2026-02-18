@@ -678,6 +678,11 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
 
     /**
      * View episode show notes (description).
+     * Displays HTML-formatted show notes with clickable links.
+     * The description field contains the best available content from the RSS feed:
+     *   - content:encoded (rich HTML show notes)
+     *   - itunes:summary (iTunes-specific summary, up to 4000 chars)
+     *   - description (basic RSS description)
      * @param episode The episode to view show notes for
      */
     private void viewShowNotes(Episode episode) {

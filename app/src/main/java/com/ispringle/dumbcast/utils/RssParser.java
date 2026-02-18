@@ -129,6 +129,14 @@ public class RssParser {
                 case "description":
                     item.setDescription(readText(parser, "description"));
                     break;
+                case "encoded":  // content:encoded
+                    // This is typically in the content namespace (content:encoded)
+                    item.setContentEncoded(readText(parser, "encoded"));
+                    break;
+                case "summary":  // itunes:summary
+                    // This is typically in the itunes namespace (itunes:summary)
+                    item.setItunesSummary(readText(parser, "summary"));
+                    break;
                 case "link":
                     item.setLink(readText(parser, "link"));
                     break;

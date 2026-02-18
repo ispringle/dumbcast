@@ -554,8 +554,9 @@ public class PodcastRepository {
                     if (isOldEpisode) {
                         episode.setSessionGrace(true);
                     } else {
-                        // Store description for NEW episodes (likely to be read soon)
-                        episode.setDescription(item.getDescription());
+                        // Store best description for NEW episodes (likely to be read soon)
+                        // Priority: content:encoded > itunes:summary > description
+                        episode.setDescription(item.getBestDescription());
                     }
                 }
 

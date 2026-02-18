@@ -60,6 +60,8 @@ public class RssFeed {
         private String guid;
         private String title;
         private String description;
+        private String contentEncoded;  // Rich HTML show notes from <content:encoded>
+        private String itunesSummary;   // iTunes-specific summary from <itunes:summary>
         private String link;
         private String enclosureUrl;
         private String enclosureType;
@@ -98,6 +100,37 @@ public class RssFeed {
 
         public void setDescription(String description) {
             this.description = description;
+        }
+
+        public String getContentEncoded() {
+            return contentEncoded;
+        }
+
+        public void setContentEncoded(String contentEncoded) {
+            this.contentEncoded = contentEncoded;
+        }
+
+        public String getItunesSummary() {
+            return itunesSummary;
+        }
+
+        public void setItunesSummary(String itunesSummary) {
+            this.itunesSummary = itunesSummary;
+        }
+
+        /**
+         * Get the best available show notes content.
+         * Priority: content:encoded > itunes:summary > description
+         * This ensures we get the richest content available.
+         */
+        public String getBestDescription() {
+            if (contentEncoded != null && !contentEncoded.trim().isEmpty()) {
+                return contentEncoded;
+            }
+            if (itunesSummary != null && !itunesSummary.trim().isEmpty()) {
+                return itunesSummary;
+            }
+            return description;
         }
 
         public String getLink() {
