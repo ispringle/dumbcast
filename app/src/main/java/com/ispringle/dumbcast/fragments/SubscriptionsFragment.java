@@ -14,7 +14,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.ListView;
+import android.widget.GridView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -46,7 +46,7 @@ public class SubscriptionsFragment extends Fragment {
 
     private static final String TAG = "SubscriptionsFragment";
 
-    private ListView listView;
+    private GridView listView;
     private TextView emptyText;
     private PodcastAdapter adapter;
     private PodcastRepository podcastRepository;
@@ -105,10 +105,34 @@ public class SubscriptionsFragment extends Fragment {
             }
         });
 
-        // Add key listener for D-pad and menu button
+        // Add key listener for D-pad, menu button, and number keys
         listView.setOnKeyListener(new View.OnKeyListener() {
             @Override
             public boolean onKey(View v, int keyCode, KeyEvent event) {
+                // Handle number keys 1-9 for direct access
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    int position = -1;
+                    switch (keyCode) {
+                        case KeyEvent.KEYCODE_1: position = 0; break;
+                        case KeyEvent.KEYCODE_2: position = 1; break;
+                        case KeyEvent.KEYCODE_3: position = 2; break;
+                        case KeyEvent.KEYCODE_4: position = 3; break;
+                        case KeyEvent.KEYCODE_5: position = 4; break;
+                        case KeyEvent.KEYCODE_6: position = 5; break;
+                        case KeyEvent.KEYCODE_7: position = 6; break;
+                        case KeyEvent.KEYCODE_8: position = 7; break;
+                        case KeyEvent.KEYCODE_9: position = 8; break;
+                    }
+
+                    if (position >= 0 && position < adapter.getCount()) {
+                        Podcast podcast = adapter.getItem(position);
+                        if (podcast != null) {
+                            navigateToEpisodeList(podcast);
+                            return true;
+                        }
+                    }
+                }
+
                 if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
                     if (event.getAction() == KeyEvent.ACTION_DOWN) {
                         int position = listView.getSelectedItemPosition();
