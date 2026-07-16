@@ -12,7 +12,6 @@ import android.os.IBinder;
 import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
 import android.text.InputType;
-import android.text.method.LinkMovementMethod;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -21,7 +20,6 @@ import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -476,8 +474,7 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
         // Build menu items in fixed order
         final String[] menuArray = new String[] {
             getString(R.string.player_menu_delete_episode),
-            getString(R.string.player_menu_skip_to_timestamp),
-            getString(R.string.player_menu_view_show_notes)
+            getString(R.string.player_menu_skip_to_timestamp)
         };
 
         // Show AlertDialog
@@ -497,7 +494,6 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
      * Fixed menu indices:
      * - 0: Delete Episode
      * - 1: Skip to Timestamp
-     * - 2: View Show Notes
      *
      * @param episode The episode to act on
      * @param actionIndex The selected menu item index
@@ -509,9 +505,6 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
                 break;
             case 1: // Skip to Timestamp
                 skipToTimestamp();
-                break;
-            case 2: // View Show Notes
-                viewShowNotes(episode);
                 break;
             default:
                 Log.w(TAG, "Unknown menu action index: " + actionIndex);
@@ -650,52 +643,6 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
         } catch (NumberFormatException e) {
             return -1;
         }
-    }
-
-    /**
-     * View episode show notes (description).
-     * Displays HTML-formatted show notes with clickable links.
-     * The description field contains the best available content from the RSS feed:
-     *   - content:encoded (rich HTML show notes)
-     *   - itunes:summary (iTunes-specific summary, up to 4000 chars)
-     *   - description (basic RSS description)
-     * @param episode The episode to view show notes for
-     */
-    private void viewShowNotes(Episode episode) {
-        if (getContext() == null) {
-            return;
-        }
-
-        String description = episode.getDescription();
-        if (description == null || description.isEmpty()) {
-            Toast.makeText(getContext(), R.string.player_no_show_notes, Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        // Parse HTML in description for proper formatting
-        CharSequence formattedDescription;
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-            formattedDescription = android.text.Html.fromHtml(description, android.text.Html.FROM_HTML_MODE_COMPACT);
-        } else {
-            formattedDescription = android.text.Html.fromHtml(description);
-        }
-
-        // Create TextView with clickable links
-        TextView textView = new TextView(getContext());
-        textView.setText(formattedDescription);
-        textView.setMovementMethod(LinkMovementMethod.getInstance()); // Make links clickable
-        textView.setPadding(48, 16, 48, 16); // Add padding for readability
-
-        // Wrap in ScrollView for long content
-        ScrollView scrollView = new ScrollView(getContext());
-        scrollView.addView(textView);
-
-        // Show description in scrollable dialog
-        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
-        builder.setTitle(R.string.player_show_notes_title);
-        builder.setView(scrollView);
-        builder.setPositiveButton(R.string.dialog_close, null);
-        builder.show();
     }
 
     /**

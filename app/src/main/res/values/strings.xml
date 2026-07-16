@@ -89,7 +89,6 @@
     <string name="player_menu_no_episode">No episode loaded</string>
     <string name="player_menu_delete_episode">Delete Episode</string>
     <string name="player_menu_skip_to_timestamp">Skip to Timestamp</string>
-    <string name="player_menu_view_show_notes">View Show Notes</string>
 
     <!-- Player Delete Episode -->
     <string name="player_delete_confirm_title">Delete Episode</string>
@@ -106,10 +105,6 @@
     <string name="player_invalid_timestamp">Invalid timestamp format</string>
     <string name="player_timestamp_exceeds_duration">Timestamp exceeds episode duration (%s)</string>
     <string name="player_skipped_to">Skipped to %s</string>
-
-    <!-- Player Show Notes -->
-    <string name="player_show_notes_title">Show Notes</string>
-    <string name="player_no_show_notes">No show notes available</string>
 
     <!-- Player UI -->
     <string name="now_playing_header">Now Playing</string>

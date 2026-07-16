@@ -611,18 +611,6 @@ public class EpisodeListFragment extends Fragment {
         // Build detailed information
         StringBuilder details = new StringBuilder();
 
-        // Description (full, not truncated)
-        if (episode.getDescription() != null && !episode.getDescription().isEmpty()) {
-            // Parse HTML if present
-            CharSequence formattedDescription;
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-                formattedDescription = android.text.Html.fromHtml(episode.getDescription(), android.text.Html.FROM_HTML_MODE_COMPACT);
-            } else {
-                formattedDescription = android.text.Html.fromHtml(episode.getDescription());
-            }
-            details.append(formattedDescription.toString().trim()).append("\n\n");
-        }
-
         // Published date
         details.append(getString(R.string.episode_details_published,
             formatTimestamp(episode.getPublishedAt()))).append("\n\n");
