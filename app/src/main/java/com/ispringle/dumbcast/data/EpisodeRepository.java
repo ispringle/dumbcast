@@ -194,7 +194,7 @@ public class EpisodeRepository {
     /**
      * Delete an episode's download and update its state appropriately.
      * If the episode is in BACKLOG state, it will be moved to AVAILABLE.
-     * This ensures deleted episodes are removed from the backlog view.
+     * LISTENED state is left alone (manual delete after finishing).
      * @param id The episode ID
      * @param downloadPath The download path to delete (for verification)
      * @return The number of rows affected
@@ -202,7 +202,6 @@ public class EpisodeRepository {
     public int deleteEpisodeDownloadAndUpdateState(long id, String downloadPath) {
         SQLiteDatabase db = dbHelper.getWritableDatabase();
 
-        // First get the current episode to check its state
         Episode episode = getEpisodeById(id);
         if (episode == null) {
             Log.w(TAG, "Cannot delete download: Episode not found (ID: " + id + ")");
@@ -211,15 +210,34 @@ public class EpisodeRepository {
 
         ContentValues values = new ContentValues();
         values.put(DatabaseHelper.COL_EPISODE_DOWNLOAD_PATH, (String) null);
-        values.put(DatabaseHelper.COL_EPISODE_DOWNLOADED_AT, 0);
+        values.putNull(DatabaseHelper.COL_EPISODE_DOWNLOADED_AT);
 
-        // If episode is in BACKLOG state, move it to AVAILABLE
-        // This removes it from the backlog view when deleted
+        // BACKLOG without a file shouldn't stay in backlog
         if (episode.getState() == EpisodeState.BACKLOG) {
             values.put(DatabaseHelper.COL_EPISODE_STATE, EpisodeState.AVAILABLE.name());
             values.put(DatabaseHelper.COL_EPISODE_VIEWED_AT, System.currentTimeMillis());
             Log.d(TAG, "Moving episode from BACKLOG to AVAILABLE after deletion: " + id);
         }
+
+        return db.update(
+            DatabaseHelper.TABLE_EPISODES,
+            values,
+            DatabaseHelper.COL_EPISODE_ID + " = ?",
+            new String[]{String.valueOf(id)}
+        );
+    }
+
+    /**
+     * Mark episode fully listened and clear its local download path in one update.
+     * Used when playback completes and the file is auto-deleted.
+     */
+    public int markListenedAndClearDownload(long id) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(DatabaseHelper.COL_EPISODE_STATE, EpisodeState.LISTENED.name());
+        values.put(DatabaseHelper.COL_EPISODE_PLAYED_AT, System.currentTimeMillis());
+        values.put(DatabaseHelper.COL_EPISODE_DOWNLOAD_PATH, (String) null);
+        values.putNull(DatabaseHelper.COL_EPISODE_DOWNLOADED_AT);
 
         return db.update(
             DatabaseHelper.TABLE_EPISODES,

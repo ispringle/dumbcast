@@ -21,6 +21,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.support.v4.app.NotificationCompat;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v4.media.MediaMetadataCompat;
 import android.support.v4.media.app.NotificationCompat.MediaStyle;
 import android.support.v4.media.session.MediaButtonReceiver;
@@ -36,6 +37,7 @@ import com.ispringle.dumbcast.data.Episode;
 import com.ispringle.dumbcast.data.EpisodeRepository;
 import com.ispringle.dumbcast.data.EpisodeState;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -800,7 +802,7 @@ public class PlaybackService extends Service {
     }
 
     /**
-     * Handle playback completion
+     * Handle playback completion: mark LISTENED, auto-delete local download, free the file handle.
      */
     private void onPlaybackCompleted() {
         Log.d(TAG, "Playback completed");
@@ -816,29 +818,70 @@ public class PlaybackService extends Service {
         unregisterNoisyReceiver();
         abandonAudioFocus();
 
-        if (currentEpisode != null) {
+        final Episode finished = currentEpisode;
+        if (finished != null) {
             int duration = getDuration();
-            int currentPosition = getCurrentPosition();
-            savePlaybackPosition(duration);
-
             if (duration > 0) {
-                double percentPlayed = (double) currentPosition / duration;
-                if (percentPlayed >= 0.9) {
-                    markAsListened();
-                    Log.d(TAG, "Episode marked as LISTENED (played " +
-                        String.format("%.1f%%", percentPlayed * 100) + ")");
-                } else {
-                    updatePlayedAt();
+                finished.setPlaybackPosition(duration);
+            }
+            finished.setState(EpisodeState.LISTENED);
+            finished.setPlayedAt(System.currentTimeMillis());
+
+            final long episodeId = finished.getId();
+            final String downloadPath = finished.isDownloaded() ? finished.getDownloadPath() : null;
+
+            // Release MediaPlayer's hold on the file before deleting it
+            if (mediaPlayer != null) {
+                try {
+                    mediaPlayer.reset();
+                } catch (IllegalStateException e) {
+                    Log.e(TAG, "Error resetting MediaPlayer after completion", e);
                 }
             }
 
-            if (currentEpisode.getState() == EpisodeState.BACKLOG) {
-                removeFromBacklog();
-                Log.d(TAG, "Episode auto-removed from BACKLOG on completion");
+            // Clear download from in-memory episode immediately
+            if (downloadPath != null) {
+                finished.setDownloadPath(null);
+                finished.setDownloadedAt(null);
+            }
+
+            if (dbExecutor != null && !dbExecutor.isShutdown()) {
+                dbExecutor.execute(() -> {
+                    try {
+                        // Persist position at end
+                        if (duration > 0) {
+                            episodeRepo.updateEpisodePlaybackPosition(episodeId, duration);
+                        }
+
+                        // Single DB update: LISTENED + clear download columns
+                        // (avoids race where removeFromBacklog overwrote LISTENED with AVAILABLE)
+                        int rows = episodeRepo.markListenedAndClearDownload(episodeId);
+                        Log.d(TAG, "Completion DB update rows=" + rows + " episode=" + episodeId);
+
+                        if (downloadPath != null && !downloadPath.isEmpty()) {
+                            File file = new File(downloadPath);
+                            if (file.exists()) {
+                                if (file.delete()) {
+                                    Log.d(TAG, "Auto-deleted finished download: " + downloadPath);
+                                } else {
+                                    Log.w(TAG, "Failed to delete finished download: " + downloadPath);
+                                }
+                            } else {
+                                Log.d(TAG, "Download already gone: " + downloadPath);
+                            }
+                        }
+
+                        // Refresh NEW/BACKLOG tabs
+                        Intent broadcast = new Intent(DownloadService.ACTION_EPISODE_STATE_CHANGED);
+                        LocalBroadcastManager.getInstance(PlaybackService.this).sendBroadcast(broadcast);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error finishing episode after completion", e);
+                    }
+                });
             }
 
             if (listener != null) {
-                listener.onPlaybackCompleted(currentEpisode);
+                listener.onPlaybackCompleted(finished);
             }
         }
 

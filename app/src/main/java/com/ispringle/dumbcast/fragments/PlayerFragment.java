@@ -410,10 +410,17 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
             getActivity().runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
+                    if (!isAdded() || getContext() == null) {
+                        return;
+                    }
                     playPauseButton.setText("");
-                    statusMessage.setText("Finished");
+                    statusMessage.setText("Finished — download removed");
                     statusMessage.setVisibility(View.VISIBLE);
-                    Toast.makeText(getContext(), "Episode finished", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "Episode finished, download deleted",
+                        Toast.LENGTH_SHORT).show();
+                    if (getActivity() instanceof com.ispringle.dumbcast.MainActivity) {
+                        ((com.ispringle.dumbcast.MainActivity) getActivity()).updateTabVisibility();
+                    }
                 }
             });
         }
