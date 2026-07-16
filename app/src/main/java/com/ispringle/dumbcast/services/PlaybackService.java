@@ -5,10 +5,15 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.BroadcastReceiver;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.database.sqlite.SQLiteDatabase;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.os.Binder;
 import android.os.Build;
@@ -16,6 +21,11 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.support.v4.app.NotificationCompat;
+import android.support.v4.media.MediaMetadataCompat;
+import android.support.v4.media.app.NotificationCompat.MediaStyle;
+import android.support.v4.media.session.MediaButtonReceiver;
+import android.support.v4.media.session.MediaSessionCompat;
+import android.support.v4.media.session.PlaybackStateCompat;
 import android.util.Log;
 
 import com.ispringle.dumbcast.MainActivity;
@@ -34,11 +44,12 @@ import java.util.concurrent.Executors;
  * Background service for audio playback with MediaPlayer integration.
  *
  * Features:
- * - Foreground service with persistent notification
+ * - MediaSession for Bluetooth / headset transport controls
+ * - Audio focus for phone calls and other media
+ * - Foreground service with media-style notification
  * - Play/pause/skip forward/backward controls
- * - Periodic position tracking (every 10 seconds)
+ * - Periodic position tracking
  * - Wakelock for screen-off playback
- * - MediaPlayer lifecycle management
  */
 public class PlaybackService extends Service {
 
@@ -59,6 +70,9 @@ public class PlaybackService extends Service {
     public static final String EXTRA_EPISODE_ID = "episode_id";
 
     private MediaPlayer mediaPlayer;
+    private MediaSessionCompat mediaSession;
+    private AudioManager audioManager;
+    private AudioFocusRequest audioFocusRequest;
     private PowerManager.WakeLock wakeLock;
     private DatabaseHelper dbHelper;
     private EpisodeRepository episodeRepo;
@@ -73,9 +87,52 @@ public class PlaybackService extends Service {
 
     // Playback state
     private boolean isPlaying = false;
+    private boolean resumeOnFocusGain = false;
+    private boolean noisyReceiverRegistered = false;
 
     // Background thread for database operations
     private ExecutorService dbExecutor;
+
+    private final AudioManager.OnAudioFocusChangeListener focusChangeListener =
+        new AudioManager.OnAudioFocusChangeListener() {
+            @Override
+            public void onAudioFocusChange(int focusChange) {
+                switch (focusChange) {
+                    case AudioManager.AUDIOFOCUS_LOSS:
+                        // Permanent loss (e.g. another app took over) — pause and don't auto-resume
+                        resumeOnFocusGain = false;
+                        pause();
+                        break;
+                    case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
+                        // Call / notification — pause, resume when focus returns
+                        resumeOnFocusGain = isPlaying;
+                        pause();
+                        break;
+                    case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+                        // Duck not useful for spoken word; pause instead
+                        resumeOnFocusGain = isPlaying;
+                        pause();
+                        break;
+                    case AudioManager.AUDIOFOCUS_GAIN:
+                        if (resumeOnFocusGain) {
+                            resumeOnFocusGain = false;
+                            play();
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+        };
+
+    private final BroadcastReceiver becomingNoisyReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (AudioManager.ACTION_AUDIO_BECOMING_NOISY.equals(intent.getAction())) {
+                pause();
+            }
+        }
+    };
 
     /**
      * Interface for playback state callbacks
@@ -105,29 +162,28 @@ public class PlaybackService extends Service {
 
         dbHelper = DatabaseManager.getInstance(this);
         episodeRepo = new EpisodeRepository(dbHelper);
-
-        // Initialize background executor for database operations
+        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
         dbExecutor = Executors.newSingleThreadExecutor();
 
-        // Initialize MediaPlayer
         mediaPlayer = new MediaPlayer();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            mediaPlayer.setAudioAttributes(new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build());
+        } else {
+            mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
+        }
         mediaPlayer.setOnCompletionListener(mp -> onPlaybackCompleted());
         mediaPlayer.setOnErrorListener((mp, what, extra) -> {
             Log.e(TAG, "MediaPlayer error: what=" + what + ", extra=" + extra);
-
-            // Error code -38 is MEDIA_ERROR_NOT_VALID_FOR_PROGRESSIVE_PLAYBACK
-            // This is a spurious error that occurs during prepareAsync() but doesn't
-            // actually prevent playback. The file plays successfully despite this error.
-            // See: https://issuetracker.google.com/issues/36905654
             if (what == -38) {
-                Log.d(TAG, "Ignoring spurious error -38 (MEDIA_ERROR_NOT_VALID_FOR_PROGRESSIVE_PLAYBACK)");
-                return true; // Error handled, don't show toast
+                Log.d(TAG, "Ignoring spurious error -38");
+                return true;
             }
-
-            // For other errors, log details and notify user
             String errorMsg = "Playback error: " + getErrorDescription(what, extra);
-            Log.e(TAG, errorMsg);
             notifyError(errorMsg);
+            updatePlaybackState(PlaybackStateCompat.STATE_ERROR);
             return true;
         });
         mediaPlayer.setOnPreparedListener(mp -> {
@@ -135,34 +191,33 @@ public class PlaybackService extends Service {
             startPlayback();
         });
 
-        // Acquire wakelock for screen-off playback
+        initMediaSession();
+
         PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "dumbcast::PlaybackWakeLock");
         wakeLock.setReferenceCounted(false);
 
-        // Initialize position tracking
         positionHandler = new Handler();
         positionRunnable = new Runnable() {
             @Override
             public void run() {
                 if (isPlaying && mediaPlayer != null) {
                     try {
-                        int position = mediaPlayer.getCurrentPosition() / 1000; // Convert to seconds
+                        int position = mediaPlayer.getCurrentPosition() / 1000;
                         int duration = mediaPlayer.getDuration() / 1000;
 
-                        // Save position to database every 10 seconds
                         long now = System.currentTimeMillis();
                         if (now - lastPositionSave >= POSITION_UPDATE_INTERVAL_MS) {
                             savePlaybackPosition(position);
                             lastPositionSave = now;
                         }
 
-                        // Notify listener of position change
                         if (listener != null) {
                             listener.onPositionChanged(position, duration);
                         }
+                        updatePlaybackState(PlaybackStateCompat.STATE_PLAYING);
 
-                        positionHandler.postDelayed(this, 1000); // Update every second
+                        positionHandler.postDelayed(this, 1000);
                     } catch (IllegalStateException e) {
                         Log.e(TAG, "Error getting playback position", e);
                     }
@@ -173,8 +228,63 @@ public class PlaybackService extends Service {
         createNotificationChannel();
     }
 
+    private void initMediaSession() {
+        mediaSession = new MediaSessionCompat(this, TAG);
+        mediaSession.setFlags(
+            MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS |
+            MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
+        );
+        mediaSession.setCallback(new MediaSessionCompat.Callback() {
+            @Override
+            public void onPlay() {
+                play();
+            }
+
+            @Override
+            public void onPause() {
+                pause();
+            }
+
+            @Override
+            public void onStop() {
+                stop();
+                stopSelf();
+            }
+
+            @Override
+            public void onSkipToNext() {
+                skipForward();
+            }
+
+            @Override
+            public void onSkipToPrevious() {
+                skipBackward();
+            }
+
+            @Override
+            public void onSeekTo(long pos) {
+                seekTo((int) (pos / 1000L));
+            }
+
+            @Override
+            public void onFastForward() {
+                skipForward();
+            }
+
+            @Override
+            public void onRewind() {
+                skipBackward();
+            }
+        });
+        mediaSession.setActive(true);
+        updatePlaybackState(PlaybackStateCompat.STATE_NONE);
+    }
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        // Handle media button intents from Bluetooth / headset
+        MediaButtonReceiver.handleIntent(mediaSession, intent);
+
         if (intent != null && intent.getAction() != null) {
             handleAction(intent.getAction(), intent);
         }
@@ -190,12 +300,10 @@ public class PlaybackService extends Service {
     public void onDestroy() {
         Log.d(TAG, "Service destroyed");
 
-        // Stop position tracking
         if (positionHandler != null) {
             positionHandler.removeCallbacks(positionRunnable);
         }
 
-        // Save final position
         if (currentEpisode != null && mediaPlayer != null) {
             try {
                 int position = mediaPlayer.getCurrentPosition() / 1000;
@@ -205,26 +313,142 @@ public class PlaybackService extends Service {
             }
         }
 
-        // Release MediaPlayer
+        abandonAudioFocus();
+        unregisterNoisyReceiver();
+
         if (mediaPlayer != null) {
-            if (mediaPlayer.isPlaying()) {
-                mediaPlayer.stop();
+            try {
+                if (mediaPlayer.isPlaying()) {
+                    mediaPlayer.stop();
+                }
+            } catch (IllegalStateException ignored) {
             }
             mediaPlayer.release();
             mediaPlayer = null;
         }
 
-        // Release wakelock
+        if (mediaSession != null) {
+            mediaSession.setActive(false);
+            mediaSession.release();
+            mediaSession = null;
+        }
+
         if (wakeLock != null && wakeLock.isHeld()) {
             wakeLock.release();
         }
 
-        // Shutdown background executor
         if (dbExecutor != null) {
             dbExecutor.shutdown();
         }
 
         super.onDestroy();
+    }
+
+    private boolean requestAudioFocus() {
+        if (audioManager == null) {
+            return true;
+        }
+        int result;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (audioFocusRequest == null) {
+                audioFocusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                    .setAudioAttributes(new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build())
+                    .setOnAudioFocusChangeListener(focusChangeListener)
+                    .setAcceptsDelayedFocusGain(true)
+                    .build();
+            }
+            result = audioManager.requestAudioFocus(audioFocusRequest);
+        } else {
+            result = audioManager.requestAudioFocus(
+                focusChangeListener,
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN
+            );
+        }
+        return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED;
+    }
+
+    private void abandonAudioFocus() {
+        if (audioManager == null) {
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (audioFocusRequest != null) {
+                audioManager.abandonAudioFocusRequest(audioFocusRequest);
+            }
+        } else {
+            audioManager.abandonAudioFocus(focusChangeListener);
+        }
+    }
+
+    private void registerNoisyReceiver() {
+        if (!noisyReceiverRegistered) {
+            registerReceiver(becomingNoisyReceiver,
+                new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY));
+            noisyReceiverRegistered = true;
+        }
+    }
+
+    private void unregisterNoisyReceiver() {
+        if (noisyReceiverRegistered) {
+            try {
+                unregisterReceiver(becomingNoisyReceiver);
+            } catch (IllegalArgumentException ignored) {
+            }
+            noisyReceiverRegistered = false;
+        }
+    }
+
+    private void updateMediaMetadata() {
+        if (mediaSession == null || currentEpisode == null) {
+            return;
+        }
+        long durationMs = 0;
+        if (mediaPlayer != null) {
+            try {
+                durationMs = mediaPlayer.getDuration();
+                if (durationMs < 0) {
+                    durationMs = 0;
+                }
+            } catch (IllegalStateException ignored) {
+            }
+        }
+        MediaMetadataCompat.Builder builder = new MediaMetadataCompat.Builder()
+            .putString(MediaMetadataCompat.METADATA_KEY_TITLE, currentEpisode.getTitle())
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, currentEpisode.getTitle())
+            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, durationMs);
+        mediaSession.setMetadata(builder.build());
+    }
+
+    private void updatePlaybackState(int state) {
+        if (mediaSession == null) {
+            return;
+        }
+        long positionMs = 0;
+        if (mediaPlayer != null) {
+            try {
+                positionMs = mediaPlayer.getCurrentPosition();
+            } catch (IllegalStateException ignored) {
+            }
+        }
+        long actions = PlaybackStateCompat.ACTION_PLAY
+            | PlaybackStateCompat.ACTION_PAUSE
+            | PlaybackStateCompat.ACTION_PLAY_PAUSE
+            | PlaybackStateCompat.ACTION_STOP
+            | PlaybackStateCompat.ACTION_SKIP_TO_NEXT
+            | PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+            | PlaybackStateCompat.ACTION_SEEK_TO
+            | PlaybackStateCompat.ACTION_FAST_FORWARD
+            | PlaybackStateCompat.ACTION_REWIND;
+
+        PlaybackStateCompat playbackState = new PlaybackStateCompat.Builder()
+            .setActions(actions)
+            .setState(state, positionMs, state == PlaybackStateCompat.STATE_PLAYING ? 1.0f : 0f)
+            .build();
+        mediaSession.setPlaybackState(playbackState);
     }
 
     /**
@@ -349,6 +573,13 @@ public class PlaybackService extends Service {
             return;
         }
 
+        if (!requestAudioFocus()) {
+            Log.w(TAG, "Audio focus not granted");
+            notifyError("Cannot play — audio focus denied");
+            updatePlaybackState(PlaybackStateCompat.STATE_PAUSED);
+            return;
+        }
+
         // Seek to saved position if needed
         int savedPosition = currentEpisode.getPlaybackPosition();
         if (savedPosition > 0 && mediaPlayer.getCurrentPosition() == 0) {
@@ -357,20 +588,20 @@ public class PlaybackService extends Service {
 
         mediaPlayer.start();
         isPlaying = true;
+        resumeOnFocusGain = false;
 
-        // Acquire wakelock
         if (wakeLock != null && !wakeLock.isHeld()) {
             wakeLock.acquire();
         }
 
-        // Start position tracking
+        registerNoisyReceiver();
         lastPositionSave = System.currentTimeMillis();
         positionHandler.post(positionRunnable);
 
-        // Update notification
+        updateMediaMetadata();
+        updatePlaybackState(PlaybackStateCompat.STATE_PLAYING);
         startForeground(NOTIFICATION_ID, buildNotification());
 
-        // Notify listener
         if (listener != null) {
             listener.onPlaybackStarted(currentEpisode);
         }
@@ -386,26 +617,27 @@ public class PlaybackService extends Service {
             mediaPlayer.pause();
             isPlaying = false;
 
-            // Release wakelock
             if (wakeLock != null && wakeLock.isHeld()) {
                 wakeLock.release();
             }
 
-            // Stop position tracking
             positionHandler.removeCallbacks(positionRunnable);
+            unregisterNoisyReceiver();
 
-            // Save current position
             if (currentEpisode != null) {
-                int position = mediaPlayer.getCurrentPosition() / 1000;
-                savePlaybackPosition(position);
+                try {
+                    int position = mediaPlayer.getCurrentPosition() / 1000;
+                    savePlaybackPosition(position);
+                } catch (IllegalStateException e) {
+                    Log.e(TAG, "Error saving position on pause", e);
+                }
             }
 
-            // Update notification
+            updatePlaybackState(PlaybackStateCompat.STATE_PAUSED);
             NotificationManager notificationManager =
                 (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             notificationManager.notify(NOTIFICATION_ID, buildNotification());
 
-            // Notify listener
             if (listener != null && currentEpisode != null) {
                 listener.onPlaybackPaused(currentEpisode);
             }
@@ -420,31 +652,37 @@ public class PlaybackService extends Service {
     public void stop() {
         if (mediaPlayer != null) {
             if (isPlaying) {
-                mediaPlayer.stop();
+                try {
+                    mediaPlayer.stop();
+                } catch (IllegalStateException e) {
+                    Log.e(TAG, "Error stopping MediaPlayer", e);
+                }
                 isPlaying = false;
             }
 
-            // Release wakelock
             if (wakeLock != null && wakeLock.isHeld()) {
                 wakeLock.release();
             }
 
-            // Stop position tracking
             positionHandler.removeCallbacks(positionRunnable);
 
-            // Save final position
             if (currentEpisode != null) {
-                int position = mediaPlayer.getCurrentPosition() / 1000;
-                savePlaybackPosition(position);
+                try {
+                    int position = mediaPlayer.getCurrentPosition() / 1000;
+                    savePlaybackPosition(position);
+                } catch (IllegalStateException e) {
+                    Log.e(TAG, "Error saving position on stop", e);
+                }
             }
         }
 
+        abandonAudioFocus();
+        unregisterNoisyReceiver();
         currentEpisode = null;
 
-        // Stop foreground service
+        updatePlaybackState(PlaybackStateCompat.STATE_STOPPED);
         stopForeground(true);
 
-        // Notify listener
         if (listener != null) {
             listener.onPlaybackStopped();
         }
@@ -464,6 +702,9 @@ public class PlaybackService extends Service {
 
                 mediaPlayer.seekTo(newPosition);
                 savePlaybackPosition(newPosition / 1000);
+                updatePlaybackState(isPlaying
+                    ? PlaybackStateCompat.STATE_PLAYING
+                    : PlaybackStateCompat.STATE_PAUSED);
 
                 Log.d(TAG, "Skipped forward to: " + (newPosition / 1000) + "s");
             } catch (IllegalStateException e) {
@@ -473,7 +714,7 @@ public class PlaybackService extends Service {
     }
 
     /**
-     * Skip backward by 15 seconds
+     * Skip backward by 30 seconds
      */
     public void skipBackward() {
         if (mediaPlayer != null && currentEpisode != null) {
@@ -483,6 +724,9 @@ public class PlaybackService extends Service {
 
                 mediaPlayer.seekTo(newPosition);
                 savePlaybackPosition(newPosition / 1000);
+                updatePlaybackState(isPlaying
+                    ? PlaybackStateCompat.STATE_PLAYING
+                    : PlaybackStateCompat.STATE_PAUSED);
 
                 Log.d(TAG, "Skipped backward to: " + (newPosition / 1000) + "s");
             } catch (IllegalStateException e) {
@@ -502,6 +746,9 @@ public class PlaybackService extends Service {
 
                 mediaPlayer.seekTo(clampedPosition * 1000);
                 savePlaybackPosition(clampedPosition);
+                updatePlaybackState(isPlaying
+                    ? PlaybackStateCompat.STATE_PLAYING
+                    : PlaybackStateCompat.STATE_PAUSED);
 
                 Log.d(TAG, "Seeked to: " + clampedPosition + "s");
             } catch (IllegalStateException e) {
@@ -559,22 +806,21 @@ public class PlaybackService extends Service {
         Log.d(TAG, "Playback completed");
 
         isPlaying = false;
+        resumeOnFocusGain = false;
 
-        // Release wakelock
         if (wakeLock != null && wakeLock.isHeld()) {
             wakeLock.release();
         }
 
-        // Stop position tracking
         positionHandler.removeCallbacks(positionRunnable);
+        unregisterNoisyReceiver();
+        abandonAudioFocus();
 
-        // Save final position and update state
         if (currentEpisode != null) {
             int duration = getDuration();
             int currentPosition = getCurrentPosition();
             savePlaybackPosition(duration);
 
-            // Check if episode was played >90% - mark as LISTENED
             if (duration > 0) {
                 double percentPlayed = (double) currentPosition / duration;
                 if (percentPlayed >= 0.9) {
@@ -582,24 +828,21 @@ public class PlaybackService extends Service {
                     Log.d(TAG, "Episode marked as LISTENED (played " +
                         String.format("%.1f%%", percentPlayed * 100) + ")");
                 } else {
-                    // Still update played_at timestamp even if not fully listened
                     updatePlayedAt();
                 }
             }
 
-            // Auto-remove from BACKLOG on completion
             if (currentEpisode.getState() == EpisodeState.BACKLOG) {
                 removeFromBacklog();
                 Log.d(TAG, "Episode auto-removed from BACKLOG on completion");
             }
 
-            // Notify listener
             if (listener != null) {
                 listener.onPlaybackCompleted(currentEpisode);
             }
         }
 
-        // Update notification
+        updatePlaybackState(PlaybackStateCompat.STATE_STOPPED);
         NotificationManager notificationManager =
             (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         notificationManager.notify(NOTIFICATION_ID, buildNotification());
@@ -800,50 +1043,37 @@ public class PlaybackService extends Service {
     }
 
     /**
-     * Build notification with playback controls
+     * Build notification with playback controls and MediaSession token for BT/lockscreen.
      */
     private Notification buildNotification() {
-        // Intent to open app and navigate to Now Playing tab when notification is clicked
         Intent intent = new Intent(this, MainActivity.class);
-        intent.putExtra(MainActivity.EXTRA_NAVIGATE_TO_TAB, 4); // TAB_NOW_PLAYING
+        intent.putExtra(MainActivity.EXTRA_NAVIGATE_TO_TAB, 0); // TAB_NOW_PLAYING
         intent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        PendingIntent pendingIntent = PendingIntent.getActivity(
-            this,
-            0,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT
+        PendingIntent contentIntent = PendingIntent.getActivity(
+            this, 100, intent, PendingIntent.FLAG_UPDATE_CURRENT
         );
 
-        // Action buttons
         PendingIntent skipBackwardIntent = PendingIntent.getService(
-            this,
-            0,
+            this, 101,
             new Intent(this, PlaybackService.class).setAction(ACTION_SKIP_BACKWARD),
             PendingIntent.FLAG_UPDATE_CURRENT
         );
-
         PendingIntent playPauseIntent = PendingIntent.getService(
-            this,
-            0,
+            this, 102,
             new Intent(this, PlaybackService.class).setAction(isPlaying ? ACTION_PAUSE : ACTION_PLAY),
             PendingIntent.FLAG_UPDATE_CURRENT
         );
-
         PendingIntent skipForwardIntent = PendingIntent.getService(
-            this,
-            0,
+            this, 103,
             new Intent(this, PlaybackService.class).setAction(ACTION_SKIP_FORWARD),
             PendingIntent.FLAG_UPDATE_CURRENT
         );
-
         PendingIntent stopIntent = PendingIntent.getService(
-            this,
-            0,
+            this, 104,
             new Intent(this, PlaybackService.class).setAction(ACTION_STOP),
             PendingIntent.FLAG_UPDATE_CURRENT
         );
 
-        // Build notification
         String title = currentEpisode != null ? currentEpisode.getTitle() : "No episode";
         String text = isPlaying ? "Playing" : "Paused";
 
@@ -851,20 +1081,24 @@ public class PlaybackService extends Service {
             .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentIntent(pendingIntent)
+            .setContentIntent(contentIntent)
             .setOngoing(isPlaying)
             .setShowWhen(false)
             .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .addAction(android.R.drawable.ic_media_rew, "<<30s", skipBackwardIntent)
+            .addAction(
+                isPlaying ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
+                isPlaying ? "Pause" : "Play",
+                playPauseIntent
+            )
+            .addAction(android.R.drawable.ic_media_ff, "30s>>", skipForwardIntent)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", stopIntent);
 
-        // Add action buttons
-        builder.addAction(0, "<<15s", skipBackwardIntent);
-        builder.addAction(0, isPlaying ? "Pause" : "Play", playPauseIntent);
-        builder.addAction(0, "30s>>", skipForwardIntent);
-
-        // Add stop button if playing
-        if (isPlaying) {
-            builder.addAction(0, "Stop", stopIntent);
+        if (mediaSession != null) {
+            builder.setStyle(new MediaStyle()
+                .setMediaSession(mediaSession.getSessionToken())
+                .setShowActionsInCompactView(0, 1, 2));
         }
 
         return builder.build();

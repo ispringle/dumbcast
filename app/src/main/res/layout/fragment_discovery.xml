@@ -5,6 +5,19 @@
     android:orientation="vertical"
     android:padding="16dp">
 
+    <Button
+        android:id="@+id/mode_toggle_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/search_mode_podcasts" />
+
+    <Button
+        android:id="@+id/paste_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/menu_paste"
+        android:layout_marginTop="4dp" />
+
     <EditText
         android:id="@+id/search_input"
         android:layout_width="match_parent"
@@ -12,7 +25,8 @@
         android:hint="@string/search_hint"
         android:inputType="text"
         android:imeOptions="actionSearch"
-        android:maxLines="1" />
+        android:maxLines="1"
+        android:layout_marginTop="8dp" />
 
     <Button
         android:id="@+id/search_button"

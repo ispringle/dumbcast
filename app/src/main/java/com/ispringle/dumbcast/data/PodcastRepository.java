@@ -6,15 +6,14 @@ import android.database.sqlite.SQLiteDatabase;
 import android.util.Log;
 
 import com.ispringle.dumbcast.utils.RssFeed;
-import com.ispringle.dumbcast.utils.RssParser;
+import com.ispringle.dumbcast.utils.RssFeedUtils;
 
 import org.xmlpull.v1.XmlPullParserException;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -27,15 +26,25 @@ public class PodcastRepository {
     private static final String TAG = "PodcastRepository";
     private static final long ONE_HOUR_MS = 60 * 60 * 1000L;
     private static final long SEVEN_DAYS_MS = 7L * 24 * 60 * 60 * 1000L;
+    private static final int DEFAULT_BATCH_SIZE = 10;
+    private static final int DUPLICATE_THRESHOLD = 10;
+
+    /** How to select episodes from a feed. */
+    private enum FetchMode {
+        /** First subscribe: take a batch from newest or oldest end based on reverseOrder. */
+        INITIAL,
+        /** Hourly refresh: always scan newest-first for episodes newer than last refresh. */
+        REFRESH,
+        /** Load more history: insert missing episodes not already in the DB. */
+        BACKFILL
+    }
 
     private final DatabaseHelper dbHelper;
     private final EpisodeRepository episodeRepository;
-    private final RssParser rssParser;
 
     public PodcastRepository(DatabaseHelper dbHelper) {
         this.dbHelper = dbHelper;
         this.episodeRepository = new EpisodeRepository(dbHelper);
-        this.rssParser = new RssParser();
     }
 
     /**
@@ -159,11 +168,73 @@ public class PodcastRepository {
     }
 
     /**
+     * Subscribe to a podcast feed and fetch the initial episode batch.
+     * Single entry point used by discovery (search, URL, audiobook).
+     *
+     * @param feedUrl Feed URL (required)
+     * @param title Preferred title (may be overridden by feed)
+     * @param description Optional description
+     * @param artworkUrl Optional artwork
+     * @param podcastIndexId Optional Podcast Index id
+     * @param reverseOrder If true, initial batch is oldest-first (audiobooks/serials)
+     * @return podcast row id, or -1 on insert failure
+     */
+    public long subscribe(String feedUrl, String title, String description, String artworkUrl,
+                          Long podcastIndexId, boolean reverseOrder)
+            throws IOException, XmlPullParserException {
+        if (feedUrl == null || feedUrl.trim().isEmpty()) {
+            throw new IOException("Feed URL is required");
+        }
+
+        Podcast existing = getPodcastByFeedUrl(feedUrl);
+        if (existing != null) {
+            Log.d(TAG, "Already subscribed to: " + feedUrl);
+            return existing.getId();
+        }
+
+        RssFeed feed = RssFeedUtils.fetchFeed(feedUrl);
+
+        String resolvedTitle = title;
+        if (resolvedTitle == null || resolvedTitle.trim().isEmpty()) {
+            resolvedTitle = feed.getTitle();
+        }
+        if (resolvedTitle == null || resolvedTitle.trim().isEmpty()) {
+            throw new IOException("Feed has no title");
+        }
+
+        Podcast podcast = new Podcast(0, feedUrl, resolvedTitle);
+        if (description != null && !description.isEmpty()) {
+            podcast.setDescription(description);
+        } else if (feed.getDescription() != null) {
+            podcast.setDescription(feed.getDescription());
+        }
+        if (artworkUrl != null && !artworkUrl.isEmpty()) {
+            podcast.setArtworkUrl(artworkUrl);
+        } else if (feed.getImageUrl() != null) {
+            podcast.setArtworkUrl(feed.getImageUrl());
+        }
+        if (podcastIndexId != null) {
+            podcast.setPodcastIndexId(podcastIndexId);
+        }
+        podcast.setReverseOrder(reverseOrder);
+
+        long podcastId = insertPodcast(podcast);
+        if (podcastId == -1) {
+            return -1;
+        }
+
+        // Prefer feed metadata when present
+        updatePodcastFromFeed(podcast, feed);
+        insertEpisodesFromFeed(podcastId, feed, DEFAULT_BATCH_SIZE, FetchMode.INITIAL, reverseOrder);
+        updateLastRefresh(podcastId);
+
+        Log.d(TAG, "Subscribed to " + resolvedTitle + " (reverseOrder=" + reverseOrder + ")");
+        return podcastId;
+    }
+
+    /**
      * Fetch episodes for a newly subscribed podcast.
-     * Sets all episodes to BACKLOG (no NEW pressure) and skips description storage.
-     * @param podcastId The ID of the podcast
-     * @throws IOException If network or I/O error occurs
-     * @throws XmlPullParserException If XML parsing error occurs
+     * If reverse order is enabled, fetches oldest episodes first (for audiobooks/series).
      */
     public void fetchInitialEpisodes(long podcastId) throws IOException, XmlPullParserException {
         Podcast podcast = getPodcastById(podcastId);
@@ -172,18 +243,12 @@ public class PodcastRepository {
             return;
         }
 
-        Log.d(TAG, "Fetching initial episodes for new subscription: " + podcast.getTitle());
+        Log.d(TAG, "Fetching initial episodes for new subscription: " + podcast.getTitle()
+            + " reverseOrder=" + podcast.isReverseOrder());
 
-        // Fetch and parse RSS feed
-        RssFeed feed = fetchFeed(podcast.getFeedUrl());
-
-        // Update podcast metadata from feed
+        RssFeed feed = RssFeedUtils.fetchFeed(podcast.getFeedUrl());
         updatePodcastFromFeed(podcast, feed);
-
-        // Insert episodes with initial subscription flag (all BACKLOG, no descriptions)
-        insertEpisodesFromFeed(podcastId, feed, 10, true);
-
-        // Update last refresh timestamp
+        insertEpisodesFromFeed(podcastId, feed, DEFAULT_BATCH_SIZE, FetchMode.INITIAL, podcast.isReverseOrder());
         updateLastRefresh(podcastId);
 
         Log.d(TAG, "Successfully fetched initial episodes: " + podcast.getTitle());
@@ -191,11 +256,7 @@ public class PodcastRepository {
 
     /**
      * Refresh a podcast's feed if it hasn't been refreshed in the last hour.
-     * Fetches RSS feed, parses it, and inserts new episodes.
-     * Updates podcast metadata from feed.
-     * @param podcastId The ID of the podcast to refresh
-     * @throws IOException If network or I/O error occurs
-     * @throws XmlPullParserException If XML parsing error occurs
+     * Always scans newest-first so reverse-order shows still get new episodes.
      */
     public void refreshPodcast(long podcastId) throws IOException, XmlPullParserException {
         Podcast podcast = getPodcastById(podcastId);
@@ -212,51 +273,48 @@ public class PodcastRepository {
 
         Log.d(TAG, "Refreshing podcast: " + podcast.getTitle());
 
-        // Fetch and parse RSS feed
-        RssFeed feed = fetchFeed(podcast.getFeedUrl());
-
-        // Update podcast metadata from feed
+        RssFeed feed = RssFeedUtils.fetchFeed(podcast.getFeedUrl());
         updatePodcastFromFeed(podcast, feed);
-
-        // Insert new episodes from feed (limit to 10 most recent, not initial subscription)
-        insertEpisodesFromFeed(podcastId, feed, 10, false);
-
-        // Update last refresh timestamp
+        // reverseOrder does not affect refresh scanning — always newest-first for new eps
+        insertEpisodesFromFeed(podcastId, feed, DEFAULT_BATCH_SIZE, FetchMode.REFRESH, false);
         updateLastRefresh(podcastId);
 
         Log.d(TAG, "Successfully refreshed podcast: " + podcast.getTitle());
     }
 
     /**
-     * Refresh a podcast's feed with a custom episode limit.
-     * Use this for "Load More Episodes" functionality.
-     * @param podcastId The ID of the podcast to refresh
-     * @param maxNewEpisodes Maximum number of new episodes to fetch (0 = unlimited)
-     * @throws IOException If network or I/O error occurs
-     * @throws XmlPullParserException If XML parsing error occurs
+     * Load additional episodes from the feed that are not already in the database.
+     * Ignores lastRefreshAt so historic episodes can be backfilled.
+     *
+     * @param podcastId Podcast to backfill
+     * @param maxEpisodes Max new rows to insert (typically 10)
+     * @return number of episodes actually inserted
      */
-    public void refreshPodcastWithLimit(long podcastId, int maxNewEpisodes) throws IOException, XmlPullParserException {
+    public int loadOlderEpisodes(long podcastId, int maxEpisodes) throws IOException, XmlPullParserException {
         Podcast podcast = getPodcastById(podcastId);
         if (podcast == null) {
-            Log.e(TAG, "Cannot refresh: Podcast not found (ID: " + podcastId + ")");
-            return;
+            Log.e(TAG, "Cannot load more: Podcast not found (ID: " + podcastId + ")");
+            return 0;
         }
 
-        Log.d(TAG, "Refreshing podcast with limit " + maxNewEpisodes + ": " + podcast.getTitle());
+        int limit = maxEpisodes > 0 ? maxEpisodes : DEFAULT_BATCH_SIZE;
+        Log.d(TAG, "Backfilling up to " + limit + " episodes for: " + podcast.getTitle());
 
-        // Fetch and parse RSS feed
-        RssFeed feed = fetchFeed(podcast.getFeedUrl());
-
-        // Update podcast metadata from feed
+        RssFeed feed = RssFeedUtils.fetchFeed(podcast.getFeedUrl());
         updatePodcastFromFeed(podcast, feed);
+        int added = insertEpisodesFromFeed(podcastId, feed, limit, FetchMode.BACKFILL, podcast.isReverseOrder());
+        // Do not bump lastRefreshAt on backfill — that would hide new-episode detection semantics
 
-        // Insert new episodes from feed with custom limit (not initial subscription)
-        insertEpisodesFromFeed(podcastId, feed, maxNewEpisodes, false);
+        Log.d(TAG, "Backfill added " + added + " episodes for: " + podcast.getTitle());
+        return added;
+    }
 
-        // Update last refresh timestamp
-        updateLastRefresh(podcastId);
-
-        Log.d(TAG, "Successfully refreshed podcast: " + podcast.getTitle());
+    /**
+     * @deprecated Use {@link #loadOlderEpisodes(long, int)} for history.
+     * Kept for callers that meant "refresh with a higher limit".
+     */
+    public void refreshPodcastWithLimit(long podcastId, int maxNewEpisodes) throws IOException, XmlPullParserException {
+        loadOlderEpisodes(podcastId, maxNewEpisodes);
     }
 
     /**
@@ -303,61 +361,6 @@ public class PodcastRepository {
     }
 
     /**
-     * Fetch RSS feed from the given URL using HttpURLConnection.
-     * @param feedUrl The URL of the RSS feed
-     * @return Parsed RssFeed object
-     * @throws IOException If network or I/O error occurs
-     * @throws XmlPullParserException If XML parsing error occurs
-     */
-    private RssFeed fetchFeed(String feedUrl) throws IOException, XmlPullParserException {
-        return fetchFeedWithRedirects(feedUrl, 5); // Allow up to 5 redirects
-    }
-
-    /**
-     * Fetch RSS feed with manual redirect following.
-     * HttpURLConnection doesn't follow HTTP -> HTTPS redirects by default.
-     */
-    private RssFeed fetchFeedWithRedirects(String feedUrl, int maxRedirects) throws IOException, XmlPullParserException {
-        if (maxRedirects <= 0) {
-            throw new IOException("Too many redirects");
-        }
-
-        URL url = new URL(feedUrl);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-
-        try {
-            connection.setRequestMethod("GET");
-            connection.setConnectTimeout(15000);
-            connection.setReadTimeout(15000);
-            connection.setRequestProperty("User-Agent", "Dumbcast/1.0");
-            connection.setInstanceFollowRedirects(false); // Handle redirects manually
-
-            int responseCode = connection.getResponseCode();
-
-            // Handle redirects (301, 302, 303, 307, 308)
-            if (responseCode >= 300 && responseCode < 400) {
-                String newUrl = connection.getHeaderField("Location");
-                if (newUrl == null) {
-                    throw new IOException("Redirect with no Location header");
-                }
-
-                Log.d(TAG, "Following redirect: " + feedUrl + " -> " + newUrl);
-                connection.disconnect();
-                return fetchFeedWithRedirects(newUrl, maxRedirects - 1);
-            }
-
-            if (responseCode != HttpURLConnection.HTTP_OK) {
-                throw new IOException("HTTP error code: " + responseCode);
-            }
-
-            InputStream inputStream = connection.getInputStream();
-            return rssParser.parse(inputStream);
-        } finally {
-            connection.disconnect();
-        }
-    }
-
-    /**
      * Update podcast metadata from RSS feed data.
      * @param podcast The podcast to update
      * @param feed The RSS feed data
@@ -393,146 +396,77 @@ public class PodcastRepository {
     }
 
     /**
-     * Insert new episodes from RSS feed into the database.
-     * Checks for existing episodes by podcast_id + guid to avoid duplicates.
-     * Sets session grace for episodes published more than 7 days ago on first fetch.
-     * @param podcastId The ID of the podcast
-     * @param feed The RSS feed containing episodes
-     * @param maxNewEpisodes Maximum number of NEW episodes to insert (0 = unlimited)
-     * @param isInitialSubscription If true, all episodes go to BACKLOG (no NEW pressure), no descriptions stored
+     * Insert episodes from an RSS feed.
+     *
+     * @param podcastId Podcast id
+     * @param feed Parsed feed
+     * @param maxNewEpisodes Cap on inserts (0 = unlimited)
+     * @param mode INITIAL / REFRESH / BACKFILL
+     * @param reverseOrder For INITIAL/BACKFILL: prefer oldest-first when true
+     * @return number of episodes inserted
      */
-    private void insertEpisodesFromFeed(long podcastId, RssFeed feed, int maxNewEpisodes, boolean isInitialSubscription) {
+    private int insertEpisodesFromFeed(long podcastId, RssFeed feed, int maxNewEpisodes,
+                                       FetchMode mode, boolean reverseOrder) {
         SQLiteDatabase db = dbHelper.getWritableDatabase();
         long now = System.currentTimeMillis();
         int newEpisodeCount = 0;
-        int skippedCount = 0;
         int consecutiveDuplicates = 0;
-        final int DUPLICATE_THRESHOLD = 10; // Stop after 10 consecutive duplicates
 
-        // Get last refresh timestamp for timestamp-based filtering on refreshes
         long lastRefreshAt = 0;
-        if (!isInitialSubscription) {
+        if (mode == FetchMode.REFRESH) {
             Podcast podcast = getPodcastById(podcastId);
             if (podcast != null) {
                 lastRefreshAt = podcast.getLastRefreshAt();
             }
         }
 
-        Log.d(TAG, "=== REFRESH DIAGNOSTICS ===");
-        Log.d(TAG, "Processing " + feed.getItems().size() + " items from feed for podcast ID: " + podcastId);
-        Log.d(TAG, "isInitialSubscription: " + isInitialSubscription);
-        Log.d(TAG, "maxNewEpisodes: " + maxNewEpisodes);
-        Log.d(TAG, "lastRefreshAt timestamp: " + lastRefreshAt + " (" + new java.util.Date(lastRefreshAt) + ")");
+        List<RssFeed.RssItem> items = prepareItemsForMode(feed, mode, reverseOrder);
 
-        int timestampSkippedCount = 0;
-        int duplicateSkippedCount = 0;
-        int invalidPublishDateCount = 0;
+        Log.d(TAG, "insertEpisodes mode=" + mode + " reverseOrder=" + reverseOrder
+            + " items=" + items.size() + " max=" + maxNewEpisodes
+            + " lastRefreshAt=" + lastRefreshAt);
 
         db.beginTransaction();
         try {
-            int processedCount = 0;
-            for (RssFeed.RssItem item : feed.getItems()) {
-                processedCount++;
-
-                // Diagnostic logging for each episode
-                long episodePublishedAt = item.getPublishedAt();
-                boolean hasValidPublishDate = episodePublishedAt > 0;
-                boolean isOlderThanLastRefresh = hasValidPublishDate && lastRefreshAt > 0 && episodePublishedAt < lastRefreshAt;
-
-                Log.d(TAG, String.format("Episode #%d: '%s'", processedCount, item.getTitle()));
-                Log.d(TAG, String.format("  publishedAt: %d (%s)", episodePublishedAt,
-                    hasValidPublishDate ? new java.util.Date(episodePublishedAt).toString() : "INVALID/ZERO"));
-                Log.d(TAG, String.format("  hasValidPublishDate: %b, isOlderThanLastRefresh: %b",
-                    hasValidPublishDate, isOlderThanLastRefresh));
-
-                if (!hasValidPublishDate) {
-                    invalidPublishDateCount++;
-                    Log.w(TAG, "  WARNING: Episode has invalid/zero publishedAt timestamp!");
-                }
-
-                // Stop processing if we've hit too many consecutive duplicates
-                // This prevents re-processing thousands of old episodes on refresh
-                if (consecutiveDuplicates >= DUPLICATE_THRESHOLD) {
-                    Log.d(TAG, "Stopping early: encountered " + DUPLICATE_THRESHOLD + " consecutive duplicates (total processed: " + (newEpisodeCount + skippedCount) + ")");
+            for (RssFeed.RssItem item : items) {
+                if (mode == FetchMode.REFRESH && consecutiveDuplicates >= DUPLICATE_THRESHOLD) {
+                    Log.d(TAG, "Stopping refresh: " + DUPLICATE_THRESHOLD + " consecutive duplicates");
                     break;
                 }
-
-                // Stop processing if we've reached the maximum number of new episodes
                 if (maxNewEpisodes > 0 && newEpisodeCount >= maxNewEpisodes) {
-                    Log.d(TAG, "Stopping: reached maximum new episodes limit of " + maxNewEpisodes);
                     break;
                 }
 
-                // For refreshes (not initial subscription), apply timestamp-based filtering
-                if (!isInitialSubscription && lastRefreshAt > 0) {
-                    long episodePublishTime = item.getPublishedAt();
-
-                    // Skip episodes without valid publish dates - they can't be reliably filtered
-                    // This prevents hundreds of undated old episodes from being added on refresh
-                    if (episodePublishTime == 0) {
-                        Log.d(TAG, "  DECISION: Skipping (no valid publish date during refresh)");
-                        timestampSkippedCount++;
-                        skippedCount++;
-                        continue;
-                    }
-
-                    // Skip episodes published before last refresh
-                    if (episodePublishTime < lastRefreshAt) {
-                        Log.d(TAG, "  DECISION: Skipping (timestamp filter - published before last refresh)");
-                        timestampSkippedCount++;
-                        skippedCount++;
-                        continue;
-                    }
-                }
-                // Only require title - GUID and enclosureUrl are now optional
                 if (item.getTitle() == null || item.getTitle().trim().isEmpty()) {
-                    Log.w(TAG, "Skipping item without title");
-                    skippedCount++;
                     continue;
                 }
 
-                // Generate GUID if missing
-                String guid = item.getGuid();
-                if (guid == null || guid.trim().isEmpty()) {
-                    if (item.getEnclosureUrl() != null && !item.getEnclosureUrl().trim().isEmpty()) {
-                        // Use enclosure URL as GUID
-                        guid = "url:" + item.getEnclosureUrl();
-                        Log.d(TAG, "Generated GUID from enclosure URL for: " + item.getTitle());
-                    } else if (item.getPublishedAt() > 0) {
-                        // Use title + publishedAt as GUID
-                        guid = "title-date:" + item.getTitle() + ":" + item.getPublishedAt();
-                        Log.d(TAG, "Generated GUID from title+date for: " + item.getTitle());
-                    } else {
-                        // Last resort: just use title
-                        guid = "title:" + item.getTitle();
-                        Log.d(TAG, "Generated GUID from title for: " + item.getTitle());
+                // Refresh: only episodes published at/after last refresh (when date known)
+                if (mode == FetchMode.REFRESH && lastRefreshAt > 0) {
+                    long publishedAt = item.getPublishedAt();
+                    if (publishedAt == 0) {
+                        // Undated items cannot be filtered safely — skip on refresh
+                        continue;
+                    }
+                    if (publishedAt < lastRefreshAt) {
+                        continue;
                     }
                 }
 
-                // Check if episode already exists
+                String guid = resolveGuid(item);
                 if (episodeExists(podcastId, guid)) {
-                    Log.d(TAG, "  DECISION: Skipping (duplicate - episode already exists)");
-                    duplicateSkippedCount++;
-                    skippedCount++;
                     consecutiveDuplicates++;
                     continue;
                 }
-
-                // Reset consecutive duplicate counter when we find a new episode
                 consecutiveDuplicates = 0;
 
-                Log.d(TAG, "  DECISION: Adding episode (new episode)");
-
-                // Create new episode with potentially generated GUID
                 Episode episode = new Episode(
                     podcastId,
                     guid,
                     item.getTitle(),
-                    item.getEnclosureUrl(),  // Can be null now
+                    item.getEnclosureUrl(),
                     item.getPublishedAt()
                 );
-
-                // Set optional fields
                 episode.setEnclosureType(item.getEnclosureType());
                 episode.setEnclosureLength(item.getEnclosureLength());
                 episode.setDuration(item.getDuration());
@@ -543,44 +477,75 @@ public class PodcastRepository {
                 long publishedAt = item.getPublishedAt();
                 boolean isOldEpisode = publishedAt > 0 && (now - publishedAt) > SEVEN_DAYS_MS;
 
-                if (isInitialSubscription) {
-                    // Initial subscription: Give session grace (old episodes won't bug you)
-                    // No description stored - descriptions only saved when episode is downloaded
-                    // Set to AVAILABLE instead of NEW to avoid overwhelming user
+                if (mode == FetchMode.INITIAL || mode == FetchMode.BACKFILL) {
+                    // No NEW spam for catalog fills
                     episode.setSessionGrace(true);
                     episode.setState(EpisodeState.AVAILABLE);
-                } else {
-                    // Subsequent refresh: No descriptions stored during refresh
-                    // Descriptions are only saved when episode is downloaded
-                    if (isOldEpisode) {
-                        episode.setSessionGrace(true);
-                    }
-                    // Description remains null - will be fetched on download
+                } else if (isOldEpisode) {
+                    episode.setSessionGrace(true);
+                    // REFRESH of truly new eps stays default NEW
                 }
 
-                // Insert episode
                 long episodeId = episodeRepository.insertEpisode(episode);
                 if (episodeId != -1) {
                     newEpisodeCount++;
-                    Log.d(TAG, "Inserted episode: " + episode.getTitle() + " (GUID: " + guid + ")");
-                } else {
-                    Log.w(TAG, "Failed to insert episode: " + episode.getTitle());
-                    skippedCount++;
+                    Log.d(TAG, "Inserted episode: " + episode.getTitle());
                 }
             }
 
             db.setTransactionSuccessful();
-            Log.d(TAG, "=== REFRESH SUMMARY ===");
-            Log.d(TAG, "Total episodes in feed: " + feed.getItems().size());
-            Log.d(TAG, "New episodes added: " + newEpisodeCount);
-            Log.d(TAG, "Total skipped: " + skippedCount);
-            Log.d(TAG, "  - Skipped by timestamp filter: " + timestampSkippedCount);
-            Log.d(TAG, "  - Skipped as duplicates: " + duplicateSkippedCount);
-            Log.d(TAG, "  - Episodes with invalid/zero publish dates: " + invalidPublishDateCount);
-            Log.d(TAG, "=======================");
+            Log.d(TAG, "insertEpisodes done mode=" + mode + " added=" + newEpisodeCount);
         } finally {
             db.endTransaction();
         }
+        return newEpisodeCount;
+    }
+
+    /**
+     * Order/filter feed items for the given fetch mode.
+     * REFRESH always newest-first. INITIAL/BACKFILL use reverseOrder for which end to prefer.
+     */
+    private List<RssFeed.RssItem> prepareItemsForMode(RssFeed feed, FetchMode mode, boolean reverseOrder) {
+        List<RssFeed.RssItem> items = new ArrayList<>(feed.getItems());
+
+        // Sort by published date when available so order is predictable
+        Collections.sort(items, new Comparator<RssFeed.RssItem>() {
+            @Override
+            public int compare(RssFeed.RssItem a, RssFeed.RssItem b) {
+                long dateA = a.getPublishedAt();
+                long dateB = b.getPublishedAt();
+                if (dateA == dateB) {
+                    return 0;
+                }
+                // Default sort: newest first
+                return dateA > dateB ? -1 : 1;
+            }
+        });
+
+        if (mode == FetchMode.REFRESH) {
+            // Newest first (already sorted)
+            return items;
+        }
+
+        // INITIAL and BACKFILL: reverseOrder means oldest-first catalog
+        if (reverseOrder) {
+            Collections.reverse(items);
+        }
+        return items;
+    }
+
+    private String resolveGuid(RssFeed.RssItem item) {
+        String guid = item.getGuid();
+        if (guid != null && !guid.trim().isEmpty()) {
+            return guid;
+        }
+        if (item.getEnclosureUrl() != null && !item.getEnclosureUrl().trim().isEmpty()) {
+            return "url:" + item.getEnclosureUrl();
+        }
+        if (item.getPublishedAt() > 0) {
+            return "title-date:" + item.getTitle() + ":" + item.getPublishedAt();
+        }
+        return "title:" + item.getTitle();
     }
 
     /**

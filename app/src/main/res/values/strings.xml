@@ -9,8 +9,15 @@
     <string name="subscriptions_title">Subscriptions</string>
     <string name="discovery_title">Discovery</string>
     <string name="search_hint">Search for podcasts</string>
+    <string name="search_hint_audiobooks">Search for audiobooks</string>
     <string name="search_button">Search</string>
+    <string name="menu_paste">Paste</string>
+    <string name="menu_switch_to_audiobooks">Switch to Audiobooks</string>
+    <string name="menu_switch_to_podcasts">Switch to Podcasts</string>
+    <string name="search_mode_podcasts">Podcasts</string>
+    <string name="search_mode_audiobooks">Audiobooks</string>
     <string name="searching">Searching...</string>
+    <string name="searching_audiobooks">Searching audiobooks...</string>
     <string name="no_results">No results found</string>
     <string name="subscribe">Subscribe</string>
     <string name="subscribing">Subscribing...</string>
@@ -81,7 +88,6 @@
     <string name="player_menu_no_service">Playback service not available</string>
     <string name="player_menu_no_episode">No episode loaded</string>
     <string name="player_menu_delete_episode">Delete Episode</string>
-    <string name="player_menu_view_chapters">View Chapters</string>
     <string name="player_menu_skip_to_timestamp">Skip to Timestamp</string>
     <string name="player_menu_view_show_notes">View Show Notes</string>
 
@@ -91,10 +97,6 @@
     <string name="player_delete_success">Episode deleted</string>
     <string name="player_delete_failed">Failed to delete episode</string>
     <string name="player_episode_not_downloaded">Episode is not downloaded</string>
-
-    <!-- Player Chapters -->
-    <string name="player_no_chapters">No chapters available</string>
-    <string name="player_chapters_not_implemented">Chapter viewing not yet implemented</string>
 
     <!-- Player Skip to Timestamp -->
     <string name="player_skip_to_timestamp_title">Skip to Timestamp</string>
@@ -139,11 +141,17 @@
     <string name="episode_details_state">State: %s</string>
     <string name="episode_details_downloaded">Downloaded: %s</string>
     <string name="episode_details_download_path">Download Path: %s</string>
-    <string name="episode_details_chapters_url">Chapters URL: %s</string>
     <string name="episode_details_enclosure_url">Media URL: %s</string>
     <string name="episode_details_guid">GUID: %s</string>
     <string name="episode_details_fetched">Fetched: %s</string>
     <string name="episode_details_not_downloaded">Not downloaded</string>
-    <string name="episode_details_no_chapters">No chapters</string>
     <string name="episode_details_unknown_duration">Unknown</string>
+
+    <!-- Episode history -->
+    <string name="toast_loading_more_episodes">Loading more episodes...</string>
+    <string name="toast_loaded_more_episodes">Loaded %d more episodes</string>
+    <string name="toast_no_more_episodes">No more episodes in feed</string>
+    <string name="toast_load_more_failed">Failed to load more episodes</string>
+    <string name="toast_reverse_order_oldest">Episodes will show oldest first</string>
+    <string name="toast_reverse_order_newest">Episodes will show newest first</string>
 </resources>

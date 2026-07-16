@@ -26,12 +26,23 @@
         <service
             android:name=".services.PlaybackService"
             android:enabled="true"
-            android:exported="false" />
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </service>
 
         <service
             android:name=".services.DownloadService"
             android:enabled="true"
             android:exported="false" />
+
+        <!-- Routes headset / Bluetooth media buttons to the active MediaSession -->
+        <receiver android:name="android.support.v4.media.session.MediaButtonReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
 
     </application>
 

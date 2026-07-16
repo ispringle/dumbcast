@@ -261,9 +261,10 @@ public class NewFragment extends Fragment {
         @Override
         protected void onPostExecute(PodcastData data) {
             NewFragment fragment = fragmentRef.get();
-            if (fragment != null && data != null) {
-                fragment.updatePodcastList(data);
+            if (fragment == null || !fragment.isAdded() || fragment.getContext() == null || data == null) {
+                return;
             }
+            fragment.updatePodcastList(data);
         }
     }
 

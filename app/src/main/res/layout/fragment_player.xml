@@ -98,18 +98,6 @@
         android:focusable="true"
         android:background="?android:attr/selectableItemBackground" />
 
-    <!-- Current chapter (initially hidden, kept for future use) -->
-    <TextView
-        android:id="@+id/player_chapter_name"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text=""
-        android:textSize="12sp"
-        android:textColor="?android:attr/textColorSecondary"
-        android:gravity="center"
-        android:paddingTop="16dp"
-        android:visibility="gone" />
-
     <!-- Status message -->
     <TextView
         android:id="@+id/player_status_message"

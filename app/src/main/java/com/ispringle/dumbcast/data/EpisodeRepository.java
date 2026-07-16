@@ -230,6 +230,30 @@ public class EpisodeRepository {
     }
 
     /**
+     * Delete all episodes for a specific podcast.
+     * This clears the episode list without affecting the subscription.
+     * @param podcastId The podcast ID
+     * @return The number of episodes deleted
+     */
+    public int deleteAllEpisodesForPodcast(long podcastId) {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+
+        db.beginTransaction();
+        try {
+            int deletedCount = db.delete(
+                DatabaseHelper.TABLE_EPISODES,
+                DatabaseHelper.COL_EPISODE_PODCAST_ID + " = ?",
+                new String[]{String.valueOf(podcastId)}
+            );
+            db.setTransactionSuccessful();
+            Log.d(TAG, "Deleted " + deletedCount + " episodes for podcast ID: " + podcastId);
+            return deletedCount;
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    /**
      * Update the playback position for an episode.
      * This is called frequently during playback, so it only updates the position column.
      * @param id The episode ID
@@ -328,8 +352,23 @@ public class EpisodeRepository {
      * @return List of episodes matching both filters, ordered by published date (newest first)
      */
     public List<Episode> getEpisodesByPodcastAndState(long podcastId, EpisodeState state) {
+        return getEpisodesByPodcastAndState(podcastId, state, false);
+    }
+
+    /**
+     * Get episodes for a specific podcast AND state with optional reverse order.
+     * @param podcastId The podcast ID to filter by
+     * @param state The episode state to filter by
+     * @param reverseOrder If true, order oldest first (for episodic podcasts)
+     * @return List of episodes matching both filters, ordered by published date
+     */
+    public List<Episode> getEpisodesByPodcastAndState(long podcastId, EpisodeState state, boolean reverseOrder) {
         SQLiteDatabase db = dbHelper.getReadableDatabase();
         List<Episode> episodes = new ArrayList<>();
+
+        String orderBy = reverseOrder ?
+            DatabaseHelper.COL_EPISODE_PUBLISHED_AT + " ASC" :
+            DatabaseHelper.COL_EPISODE_PUBLISHED_AT + " DESC";
 
         Cursor cursor = db.query(
             DatabaseHelper.TABLE_EPISODES,
@@ -338,7 +377,7 @@ public class EpisodeRepository {
             new String[]{String.valueOf(podcastId), state.name()},
             null,
             null,
-            DatabaseHelper.COL_EPISODE_PUBLISHED_AT + " DESC"
+            orderBy
         );
 
         if (cursor != null) {

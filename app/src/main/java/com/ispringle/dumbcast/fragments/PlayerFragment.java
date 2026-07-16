@@ -46,7 +46,6 @@ import java.lang.ref.WeakReference;
  * - Displays currently playing episode metadata
  * - Shows real-time playback progress
  * - Play/pause/skip controls via keypad
- * - Chapter support (UI ready)
  * - Simple text-based UI for performance
  *
  * Keypad Controls:
@@ -61,7 +60,6 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
     // UI Components
     private ImageView artworkImage;
     private TextView episodeTitleText;
-    private TextView chapterNameText;
     private TextView progressText;
     private TextView elapsedTimeText;
     private TextView totalTimeText;
@@ -105,7 +103,6 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
         // Initialize UI components
         artworkImage = view.findViewById(R.id.player_artwork);
         episodeTitleText = view.findViewById(R.id.player_episode_title);
-        chapterNameText = view.findViewById(R.id.player_chapter_name);
         progressText = view.findViewById(R.id.player_progress_text);
         playPauseButton = view.findViewById(R.id.player_play_pause);
         statusMessage = view.findViewById(R.id.player_status_message);
@@ -318,7 +315,6 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
         artworkImage.setBackgroundColor(0);
         artworkImage.setImageResource(R.drawable.ic_podcast_brain);
         episodeTitleText.setText(R.string.no_episode_loaded);
-        chapterNameText.setVisibility(View.GONE);
         elapsedTimeText.setText("0:00");
         totalTimeText.setText("0:00");
         progressBar.setProgress(0);
@@ -473,7 +469,6 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
         // Build menu items in fixed order
         final String[] menuArray = new String[] {
             getString(R.string.player_menu_delete_episode),
-            getString(R.string.player_menu_view_chapters),
             getString(R.string.player_menu_skip_to_timestamp),
             getString(R.string.player_menu_view_show_notes)
         };
@@ -494,9 +489,8 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
      * Handle context menu action selection.
      * Fixed menu indices:
      * - 0: Delete Episode
-     * - 1: View Chapters
-     * - 2: Skip to Timestamp
-     * - 3: View Show Notes
+     * - 1: Skip to Timestamp
+     * - 2: View Show Notes
      *
      * @param episode The episode to act on
      * @param actionIndex The selected menu item index
@@ -506,13 +500,10 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
             case 0: // Delete Episode
                 deleteEpisode(episode);
                 break;
-            case 1: // View Chapters
-                viewChapters(episode);
-                break;
-            case 2: // Skip to Timestamp
+            case 1: // Skip to Timestamp
                 skipToTimestamp();
                 break;
-            case 3: // View Show Notes
+            case 2: // View Show Notes
                 viewShowNotes(episode);
                 break;
             default:
@@ -549,28 +540,6 @@ public class PlayerFragment extends Fragment implements PlaybackService.Playback
         });
         builder.setNegativeButton(R.string.dialog_cancel, null);
         builder.show();
-    }
-
-    /**
-     * View chapters for an episode.
-     * Shows chapter list if available, otherwise shows a message.
-     * @param episode The episode to view chapters for
-     */
-    private void viewChapters(Episode episode) {
-        if (getContext() == null) {
-            return;
-        }
-
-        // Check if episode has chapters
-        String chaptersUrl = episode.getChaptersUrl();
-        if (chaptersUrl == null || chaptersUrl.isEmpty()) {
-            Toast.makeText(getContext(), R.string.player_no_chapters, Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        // TODO: Implement chapter parsing and display
-        // For now, show placeholder message
-        Toast.makeText(getContext(), R.string.player_chapters_not_implemented, Toast.LENGTH_SHORT).show();
     }
 
     /**

@@ -397,6 +397,8 @@ public class EpisodeListFragment extends Fragment {
             "✓ Reverse Episode Order" :
             "Reverse Episode Order";
         menuItems.add(toggleLabel);
+        menuItems.add("Load More Episodes");
+        menuItems.add("Clear Episode List");
 
         final CharSequence[] items = menuItems.toArray(new CharSequence[0]);
 
@@ -405,20 +407,73 @@ public class EpisodeListFragment extends Fragment {
         builder.setItems(items, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
-                if (which == 0) {
-                    // Toggle reverse order
-                    boolean newReverseOrder = podcastRepository.toggleReverseOrder(podcastId);
-                    String message = newReverseOrder ?
-                        "Episodes will show oldest first" :
-                        "Episodes will show newest first";
-                    Toast.makeText(getContext(), message, Toast.LENGTH_SHORT).show();
-                    // Reload episodes to apply new order
-                    loadEpisodes();
+                switch (which) {
+                    case 0:
+                        // Toggle reverse order (display sort only; use Load More for history)
+                        boolean newReverseOrder = podcastRepository.toggleReverseOrder(podcastId);
+                        Toast.makeText(getContext(),
+                            newReverseOrder
+                                ? R.string.toast_reverse_order_oldest
+                                : R.string.toast_reverse_order_newest,
+                            Toast.LENGTH_SHORT).show();
+                        loadEpisodes();
+                        break;
+                    case 1:
+                        loadMoreEpisodes();
+                        break;
+                    case 2:
+                        confirmClearEpisodes();
+                        break;
                 }
             }
         });
         builder.setNegativeButton(R.string.dialog_cancel, null);
         builder.show();
+    }
+
+    /**
+     * Load the next 10 episodes from the feed.
+     * Determines the oldest/newest episode in the list and fetches the next batch.
+     */
+    private void loadMoreEpisodes() {
+        if (podcastId == -1) {
+            return;
+        }
+
+        Toast.makeText(getContext(), R.string.toast_loading_more_episodes, Toast.LENGTH_SHORT).show();
+        new LoadMoreEpisodesTask(this, podcastRepository, podcastId).execute();
+    }
+
+    /**
+     * Show confirmation dialog before clearing episode list.
+     */
+    private void confirmClearEpisodes() {
+        if (getContext() == null || podcastId == -1) {
+            return;
+        }
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+        builder.setTitle("Clear Episode List");
+        builder.setMessage("This will remove all episodes from the list without affecting the podcast subscription. You can reload them later. Continue?");
+        builder.setPositiveButton("Clear", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                clearEpisodeList();
+            }
+        });
+        builder.setNegativeButton(R.string.dialog_cancel, null);
+        builder.show();
+    }
+
+    /**
+     * Clear all episodes for the current podcast from the database.
+     */
+    private void clearEpisodeList() {
+        if (podcastId == -1) {
+            return;
+        }
+
+        new ClearEpisodesTask(this, episodeRepository, podcastId).execute();
     }
 
     /**
@@ -601,14 +656,6 @@ public class EpisodeListFragment extends Fragment {
             }
         } else {
             details.append(getString(R.string.episode_details_not_downloaded)).append("\n\n");
-        }
-
-        // Chapters URL
-        if (episode.getChaptersUrl() != null && !episode.getChaptersUrl().isEmpty()) {
-            details.append(getString(R.string.episode_details_chapters_url,
-                episode.getChaptersUrl())).append("\n\n");
-        } else {
-            details.append(getString(R.string.episode_details_no_chapters)).append("\n\n");
         }
 
         // Media URL
@@ -795,9 +842,9 @@ public class EpisodeListFragment extends Fragment {
             }
 
             if (fragment.podcastId != -1 && fragment.episodeState != null) {
-                // Load episodes by both podcast ID AND state
-                Log.d(TAG, "LoadEpisodesTask - calling getEpisodesByPodcastAndState(" + fragment.podcastId + ", " + fragment.episodeState + ")");
-                episodes = episodeRepository.getEpisodesByPodcastAndState(fragment.podcastId, fragment.episodeState);
+                // Load episodes by both podcast ID AND state (with reverse order if enabled)
+                Log.d(TAG, "LoadEpisodesTask - calling getEpisodesByPodcastAndState(" + fragment.podcastId + ", " + fragment.episodeState + ", reverseOrder=" + reverseOrder + ")");
+                episodes = episodeRepository.getEpisodesByPodcastAndState(fragment.podcastId, fragment.episodeState, reverseOrder);
                 Log.d(TAG, "LoadEpisodesTask - loaded " + episodes.size() + " episodes");
             } else if (fragment.podcastId != -1) {
                 // Load episodes by podcast ID only (with reverse order if enabled)
@@ -830,9 +877,10 @@ public class EpisodeListFragment extends Fragment {
         @Override
         protected void onPostExecute(EpisodeData data) {
             EpisodeListFragment fragment = fragmentRef.get();
-            if (fragment != null && data != null) {
-                fragment.updateEpisodeList(data);
+            if (fragment == null || !fragment.isAdded() || fragment.getContext() == null || data == null) {
+                return;
             }
+            fragment.updateEpisodeList(data);
         }
     }
 
@@ -1066,7 +1114,7 @@ public class EpisodeListFragment extends Fragment {
         @Override
         protected void onPostExecute(PreviewResult result) {
             EpisodeListFragment fragment = fragmentRef.get();
-            if (fragment == null || fragment.getContext() == null) return;
+            if (fragment == null || !fragment.isAdded() || fragment.getContext() == null) return;
 
             if (result.isSuccess()) {
                 EpisodeData data = new EpisodeData(result.getEpisodes(), result.getPodcastCache());
@@ -1097,6 +1145,118 @@ public class EpisodeListFragment extends Fragment {
                 // Show empty state
                 EpisodeData emptyData = new EpisodeData(new ArrayList<Episode>(), new HashMap<Long, Podcast>());
                 fragment.updateEpisodeList(emptyData);
+            }
+        }
+    }
+
+    /**
+     * AsyncTask to backfill older/missing episodes from the feed.
+     */
+    private static class LoadMoreEpisodesTask extends AsyncTask<Void, Void, LoadMoreResult> {
+        private final WeakReference<EpisodeListFragment> fragmentRef;
+        private final PodcastRepository podcastRepository;
+        private final long podcastId;
+
+        LoadMoreEpisodesTask(EpisodeListFragment fragment, PodcastRepository podcastRepository,
+                             long podcastId) {
+            this.fragmentRef = new WeakReference<>(fragment);
+            this.podcastRepository = podcastRepository;
+            this.podcastId = podcastId;
+        }
+
+        @Override
+        protected LoadMoreResult doInBackground(Void... voids) {
+            try {
+                int added = podcastRepository.loadOlderEpisodes(podcastId, 10);
+                return new LoadMoreResult(true, null, added);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to load more episodes", e);
+                return new LoadMoreResult(false, e.getMessage(), 0);
+            }
+        }
+
+        @Override
+        protected void onPostExecute(LoadMoreResult result) {
+            EpisodeListFragment fragment = fragmentRef.get();
+            if (fragment == null || !fragment.isAdded() || fragment.getContext() == null) {
+                return;
+            }
+
+            if (result.success) {
+                if (result.episodesAdded > 0) {
+                    Toast.makeText(fragment.getContext(),
+                        fragment.getString(R.string.toast_loaded_more_episodes, result.episodesAdded),
+                        Toast.LENGTH_SHORT).show();
+                    fragment.loadEpisodes();
+                } else {
+                    Toast.makeText(fragment.getContext(),
+                        R.string.toast_no_more_episodes,
+                        Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                Toast.makeText(fragment.getContext(),
+                    R.string.toast_load_more_failed,
+                    Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    /**
+     * Result container for LoadMoreEpisodesTask.
+     */
+    private static class LoadMoreResult {
+        final boolean success;
+        final String errorMessage;
+        final int episodesAdded;
+
+        LoadMoreResult(boolean success, String errorMessage, int episodesAdded) {
+            this.success = success;
+            this.errorMessage = errorMessage;
+            this.episodesAdded = episodesAdded;
+        }
+    }
+
+    /**
+     * AsyncTask to clear all episodes for a podcast.
+     */
+    private static class ClearEpisodesTask extends AsyncTask<Void, Void, Boolean> {
+        private final WeakReference<EpisodeListFragment> fragmentRef;
+        private final EpisodeRepository episodeRepository;
+        private final long podcastId;
+
+        ClearEpisodesTask(EpisodeListFragment fragment, EpisodeRepository episodeRepository, long podcastId) {
+            this.fragmentRef = new WeakReference<>(fragment);
+            this.episodeRepository = episodeRepository;
+            this.podcastId = podcastId;
+        }
+
+        @Override
+        protected Boolean doInBackground(Void... voids) {
+            try {
+                int deletedCount = episodeRepository.deleteAllEpisodesForPodcast(podcastId);
+                Log.d(TAG, "Cleared " + deletedCount + " episodes for podcast ID: " + podcastId);
+                return true;
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to clear episodes", e);
+                return false;
+            }
+        }
+
+        @Override
+        protected void onPostExecute(Boolean success) {
+            EpisodeListFragment fragment = fragmentRef.get();
+            if (fragment == null || !fragment.isAdded() || fragment.getContext() == null) return;
+
+            if (success) {
+                Toast.makeText(fragment.getContext(),
+                    "Episode list cleared",
+                    Toast.LENGTH_SHORT).show();
+                // Reload episode list (should be empty now)
+                fragment.loadEpisodes();
+            } else {
+                Toast.makeText(fragment.getContext(),
+                    "Failed to clear episode list",
+                    Toast.LENGTH_LONG).show();
             }
         }
     }

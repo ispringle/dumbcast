@@ -196,46 +196,61 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * Update tab visibility dynamically based on current episode counts.
-     * This should be called after episode state changes (download, delete, state changes).
-     * Attempts to preserve the current fragment if possible.
+     * Counts are read off the main thread to avoid jank/crashes during feed refresh.
+     * Preserves the current fragment when the tab type is still available.
      */
     public void updateTabVisibility() {
         Log.d(TAG, "updateTabVisibility: Updating tab visibility");
+        final int currentTabType = getCurrentTab();
 
-        // Remember current tab type (not index)
-        int currentTabType = getCurrentTab();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                final int newCount = episodeRepository.getEpisodeCountByState(EpisodeState.NEW);
+                final int backlogCount = episodeRepository.getEpisodeCountByState(EpisodeState.BACKLOG);
 
-        // Get current fragment to check if we're on a tab-level view
-        Fragment currentFragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (isFinishing()) {
+                            return;
+                        }
+                        applyVisibleTabs(newCount, backlogCount, currentTabType);
+                    }
+                });
+            }
+        }).start();
+    }
 
-        // Rebuild visible tabs list
-        buildVisibleTabs();
+    /**
+     * Rebuild visible tab list from precomputed counts and optionally navigate
+     * only when the current tab type disappeared.
+     */
+    private void applyVisibleTabs(int newCount, int backlogCount, int previousTabType) {
+        visibleTabs.clear();
+        visibleTabs.add(TAB_NOW_PLAYING);
+        if (newCount > 0) {
+            visibleTabs.add(TAB_NEW);
+        }
+        if (backlogCount > 0) {
+            visibleTabs.add(TAB_BACKLOG);
+        }
+        visibleTabs.add(TAB_SUBSCRIPTIONS);
+        visibleTabs.add(TAB_DISCOVER);
 
-        // Try to find the current tab in the new visible tabs list
-        int newTabIndex = findTabIndex(currentTabType);
-
+        int newTabIndex = findTabIndex(previousTabType);
         if (newTabIndex != -1) {
-            // Current tab is still visible, update index
             currentTabIndex = newTabIndex;
-            Log.d(TAG, "updateTabVisibility: Current tab still visible at index " + currentTabIndex);
-        } else {
-            // Current tab is no longer visible, navigate to a sensible default
-            Log.d(TAG, "updateTabVisibility: Current tab no longer visible, navigating to default");
-
-            // If we were on NEW or BACKLOG and they're gone, navigate to Subscriptions (or Now Playing if we have active playback)
-            if (currentTabType == TAB_NEW || currentTabType == TAB_BACKLOG) {
-                // Navigate to Subscriptions (it's always visible)
-                currentTabIndex = findTabIndex(TAB_SUBSCRIPTIONS);
-                if (currentTabIndex != -1) {
-                    loadFragmentForTab(TAB_SUBSCRIPTIONS);
-                }
+            // Keep existing fragment — do not replace while user is interacting
+        } else if (previousTabType == TAB_NEW || previousTabType == TAB_BACKLOG) {
+            currentTabIndex = findTabIndex(TAB_SUBSCRIPTIONS);
+            if (currentTabIndex != -1) {
+                loadFragmentForTab(TAB_SUBSCRIPTIONS);
             }
         }
 
-        // Update tab indicator
         updateTabIndicator();
-
-        Log.d(TAG, "updateTabVisibility: Complete. Current tab index=" + currentTabIndex);
+        Log.d(TAG, "applyVisibleTabs: tabs=" + visibleTabs.size() + " index=" + currentTabIndex);
     }
 
     /**

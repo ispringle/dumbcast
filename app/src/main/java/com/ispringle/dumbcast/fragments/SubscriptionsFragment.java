@@ -434,9 +434,10 @@ public class SubscriptionsFragment extends Fragment {
         @Override
         protected void onPostExecute(PodcastData data) {
             SubscriptionsFragment fragment = fragmentRef.get();
-            if (fragment != null && data != null) {
-                fragment.updatePodcastList(data);
+            if (fragment == null || !fragment.isAdded() || fragment.getContext() == null || data == null) {
+                return;
             }
+            fragment.updatePodcastList(data);
         }
     }
 
